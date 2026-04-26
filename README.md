@@ -31,7 +31,11 @@
 - **Dedicated notifications module**: New notification model, APIs, and socket delivery path integrated across swap/message/review events.
 - **Role-safe admin swap view**: Added admin-specific swap detail view for safe moderation and chat inspection.
 - **Chats entrypoint in navbar**: Authenticated users can open chats directly from top navigation.
-- **Enhanced browse and interaction UX**: Search/filter and chat-related refinements for smoother user journey.
+- **Reverse-Geocoding Integration**: Automatically maps GPS coordinates to user-friendly City, State, and Country fields using the Nominatim OpenStreetMap API.
+- **Centralized Error & State Architecture**: Comprehensive error boundaries, skeleton loaders, and empty states implemented across all pages for maximum UI/UX reliability.
+- **Native Modals Replaced**: Systematically removed all native browser `window.alert` and `window.confirm` dialogs in favor of custom Framer Motion-powered `ConfirmationModal` components.
+- **Multipart Image Management**: Advanced frontend and backend logic to handle multiple image uploads and precise image removal for editing items.
+- **Enhanced browse and interaction UX**: Search/filter and chat-related refinements for smoother user journey, including global CSS standardizations and removing inline styles.
 
 ---
 

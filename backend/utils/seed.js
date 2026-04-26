@@ -23,16 +23,14 @@ const seedDB = async () => {
     await mongoose.connect(process.env.MONGO_URI);
     console.log('✅ Connected to MongoDB');
 
-    // Clear existing data
-    await Promise.all([
-      User.deleteMany({}),
-      Item.deleteMany({}),
-      SustainabilityStats.deleteMany({}),
-    ]);
+    // Clear existing data COMPLETELY
+    await User.deleteMany({});
+    await Item.deleteMany({});
+    await SustainabilityStats.deleteMany({});
     console.log('🗑️  Cleared existing data');
 
     // Create admin user
-    const admin = await User.create({
+    const admin = new User({
       name: 'Admin ReWear',
       email: 'admin@rewear.com',
       password: 'Admin@123',
@@ -43,9 +41,10 @@ const seedDB = async () => {
       badges: ['Top Contributor', 'Eco Warrior'],
       location: { city: 'Mumbai', state: 'Maharashtra', country: 'India' },
     });
+    await admin.save();
 
     // Create sample users
-    const users = await User.create([
+    const userData = [
       {
         name: 'Priya Sharma',
         email: 'priya@rewear.com',
@@ -82,7 +81,14 @@ const seedDB = async () => {
         badges: ['First Swap', '5 Swaps', '10 Swaps', 'Eco Warrior', 'Top Contributor'],
         location: { city: 'Pune', state: 'Maharashtra', country: 'India' },
       },
-    ]);
+    ];
+
+    const users = [];
+    for (const u of userData) {
+      const user = new User(u);
+      await user.save();
+      users.push(user);
+    }
 
     // Create sample items
     const itemData = [
