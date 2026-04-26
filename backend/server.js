@@ -19,6 +19,7 @@ const swapRoutes = require('./routes/swaps');
 const reviewRoutes = require('./routes/reviews');
 const messageRoutes = require('./routes/messages');
 const adminRoutes = require('./routes/admin');
+const notificationRoutes = require('./routes/notifications');
 
 // Connect to MongoDB
 connectDB();
@@ -71,6 +72,7 @@ app.use('/api/swaps', swapRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // ─── Health Check ──────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {

@@ -42,6 +42,8 @@ export const authService = {
   getMe: () => api.get('/auth/me'),
   logout: () => api.post('/auth/logout'),
   updateProfile: (data) => api.put('/auth/profile', data),
+  forgotPassword: (data) => api.post('/auth/forgot-password', data),
+  resetPassword: (token, data) => api.post(`/auth/reset-password/${token}`, data),
 };
 
 // ─── Item Services ─────────────────────────────────────────────────────────
@@ -77,6 +79,13 @@ export const reviewService = {
 export const messageService = {
   getMessages: (swapId) => api.get(`/messages/swap/${swapId}`),
   sendMessage: (swapId, content) => api.post(`/messages/swap/${swapId}`, { content }),
+};
+
+// ─── Notification Services ───────────────────────────────────────────────
+export const notificationService = {
+  getMyNotifications: () => api.get('/notifications'),
+  markRead: (id) => api.patch(`/notifications/${id}/read`),
+  markAllRead: () => api.patch('/notifications/read-all'),
 };
 
 // ─── Public Stats Service ────────────────────────────────────────────────

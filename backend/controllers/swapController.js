@@ -2,6 +2,7 @@ const Swap = require('../models/Swap');
 const Item = require('../models/Item');
 const User = require('../models/User');
 const SustainabilityStats = require('../models/SustainabilityStats');
+const { createNotification } = require('../utils/notifications');
 
 // Helper: award badges and update sustainability on swap completion
 const onSwapCompleted = async (swap) => {
@@ -58,6 +59,23 @@ exports.createSwap = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Cannot swap your own item' });
     }
 
+    let offeredItem = null;
+    if (type === 'swap') {
+      if (!offeredItemId) {
+        return res.status(400).json({ success: false, message: 'Select an item to offer for the swap' });
+      }
+      offeredItem = await Item.findById(offeredItemId);
+      if (!offeredItem) {
+        return res.status(400).json({ success: false, message: 'Offered item not found' });
+      }
+      if (offeredItem.owner.toString() !== req.user._id.toString()) {
+        return res.status(400).json({ success: false, message: 'You can only offer one of your own items' });
+      }
+      if (!offeredItem.isAvailable || offeredItem.status !== 'approved') {
+        return res.status(400).json({ success: false, message: 'Offered item is not available' });
+      }
+    }
+
     // Check for existing swap request
     const existingSwap = await Swap.findOne({
       item: itemId,
@@ -84,7 +102,7 @@ exports.createSwap = async (req, res, next) => {
       requester: req.user._id,
       owner: item.owner,
       type,
-      offeredItem: offeredItemId || null,
+      offeredItem: offeredItem ? offeredItem._id : null,
       pointsOffered: type === 'points' ? item.pointsValue : 0,
       message,
     });
@@ -94,6 +112,17 @@ exports.createSwap = async (req, res, next) => {
       { path: 'requester', select: 'name avatar' },
       { path: 'owner', select: 'name avatar' },
     ]);
+
+    await createNotification(req, {
+      recipient: item.owner,
+      actor: req.user._id,
+      type: 'swap-request',
+      title: 'New swap request',
+      body: `${req.user.name} requested a ${type === 'points' ? 'points redemption' : 'swap'} for ${item.title}.`,
+      link: `/chat/${swap._id}`,
+      item: item._id,
+      swap: swap._id,
+    });
 
     res.status(201).json({ success: true, swap });
   } catch (error) {
@@ -186,6 +215,26 @@ exports.updateSwapStatus = async (req, res, next) => {
     }
 
     await swap.save();
+
+    const itemDoc = await Item.findById(swap.item).select('title');
+    const notificationTargets = new Set();
+    if (status === 'completed') {
+      notificationTargets.add(swap.requester.toString());
+      notificationTargets.add(swap.owner.toString());
+    } else {
+      notificationTargets.add(['accepted', 'rejected'].includes(status) ? swap.requester.toString() : swap.owner.toString());
+    }
+
+    await Promise.all([...notificationTargets].map((recipient) => createNotification(req, {
+      recipient,
+      actor: req.user._id,
+      type: 'swap-status',
+      title: `Swap ${status}`,
+      body: `${itemDoc?.title || 'A swap'} has been ${status}.`,
+      link: `/chat/${swap._id}`,
+      item: swap.item,
+      swap: swap._id,
+    })));
 
     // Emit socket event
     const io = req.app.get('io');

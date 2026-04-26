@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
+import { NotificationProvider } from './context/NotificationContext';
+import { ChatProvider } from './context/ChatContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import { ProtectedRoute, AdminRoute } from './components/ProtectedRoute';
@@ -17,6 +19,13 @@ const AddItemPage = lazy(() => import('./pages/AddItemPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
 const AdminPanel = lazy(() => import('./pages/AdminPanel'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const EditProfilePage = lazy(() => import('./pages/EditProfilePage'));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
+const AdminSwapDetailPage = lazy(() => import('./pages/AdminSwapDetailPage'));
+const ChatsPage = lazy(() => import('./pages/ChatsPage'));
 
 // Loading fallback
 const PageLoader = () => (
@@ -37,8 +46,8 @@ const OAuthSuccess = () => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
     if (token) {
-      saveAuth(token).then(() => {
-        navigate('/dashboard', { replace: true });
+      saveAuth(token).then((user) => {
+        navigate(user?.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
       });
     } else {
       navigate('/login', { replace: true });
@@ -67,14 +76,19 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <SocketProvider>
-          <Suspense fallback={<PageLoader />}>
-            <Routes>
+          <NotificationProvider>
+            <ChatProvider>
+              <Suspense fallback={<PageLoader />}>
+                <Routes>
               {/* Auth pages - no navbar/footer */}
               <Route path="/login" element={<AuthLayout><LoginPage /></AuthLayout>} />
               <Route path="/register" element={<AuthLayout><RegisterPage /></AuthLayout>} />
+              <Route path="/forgot-password" element={<AuthLayout><ForgotPasswordPage /></AuthLayout>} />
+              <Route path="/reset-password/:token" element={<AuthLayout><ResetPasswordPage /></AuthLayout>} />
 
               {/* OAuth success handler */}
               <Route path="/auth/success" element={<OAuthSuccess />} />
+              <Route path="/oauth-success" element={<OAuthSuccess />} />
 
               {/* Chat page - full screen, no footer */}
               <Route path="/chat/:swapId" element={
@@ -102,42 +116,74 @@ function App() {
                 </ProtectedRoute>
               } />
 
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <MainLayout><ProfilePage /></MainLayout>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/edit-profile" element={
+                <ProtectedRoute>
+                  <MainLayout><EditProfilePage /></MainLayout>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/notifications" element={
+                <ProtectedRoute>
+                  <MainLayout><NotificationsPage /></MainLayout>
+                </ProtectedRoute>
+              } />
+
+              <Route path="/chats" element={
+                <ProtectedRoute>
+                  <MainLayout><ChatsPage /></MainLayout>
+                </ProtectedRoute>
+              } />
+
               <Route path="/admin" element={
                 <AdminRoute>
                   <MainLayout><AdminPanel /></MainLayout>
                 </AdminRoute>
               } />
 
+              <Route path="/admin/swaps/:swapId" element={
+                <AdminRoute>
+                  <MainLayout><AdminSwapDetailPage /></MainLayout>
+                </AdminRoute>
+              } />
+
               {/* Catch all - redirect to home */}
               <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
+                </Routes>
+              </Suspense>
 
-          {/* Global Toast Notifications */}
-          <Toaster
-            position="top-right"
-            gutter={12}
-            containerStyle={{ top: 80 }}
-            toastOptions={{
-              duration: 4000,
-              style: {
-                fontFamily: "'Inter', sans-serif",
-                fontWeight: 600,
-                fontSize: '0.9rem',
-                borderRadius: '12px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
-                padding: '12px 16px',
-              },
-              success: {
-                iconTheme: { primary: '#1B5E20', secondary: 'white' },
-                style: { background: '#F0FFF4', border: '1px solid rgba(27,94,32,0.2)', color: '#1a1a2e' },
-              },
-              error: {
-                iconTheme: { primary: '#dc2626', secondary: 'white' },
-                style: { background: '#FFF5F5', border: '1px solid rgba(220,38,38,0.2)', color: '#1a1a2e' },
-              },
-            }}
-          />
+              {/* Global Toast Notifications */}
+              <Toaster
+                position="top-right"
+                gutter={12}
+                containerStyle={{ top: 80 }}
+                toastOptions={{
+                  duration: 4000,
+                  style: {
+                    fontFamily: "'Inter', sans-serif",
+                    fontWeight: 600,
+                    fontSize: '0.9rem',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.12)',
+                    padding: '12px 16px',
+                  },
+                  success: {
+                    iconTheme: { primary: '#1B5E20', secondary: 'white' },
+                    style: { background: '#F0FFF4', border: '1px solid rgba(27,94,32,0.2)', color: '#1a1a2e' },
+                  },
+                  error: {
+                    iconTheme: { primary: '#dc2626', secondary: 'white' },
+                    style: { background: '#FFF5F5', border: '1px solid rgba(220,38,38,0.2)', color: '#1a1a2e' },
+                  },
+                }}
+              />
+            </ChatProvider>
+          </NotificationProvider>
         </SocketProvider>
       </AuthProvider>
     </BrowserRouter>

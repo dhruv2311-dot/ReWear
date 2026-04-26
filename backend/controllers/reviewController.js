@@ -1,5 +1,6 @@
 const Review = require('../models/Review');
 const Item = require('../models/Item');
+const { createNotification } = require('../utils/notifications');
 
 // ─── Create Review ────────────────────────────────────────────────────────────
 exports.createReview = async (req, res, next) => {
@@ -21,6 +22,16 @@ exports.createReview = async (req, res, next) => {
       item: itemId,
       rating,
       comment,
+    });
+
+    await createNotification(req, {
+      recipient: item.owner,
+      actor: req.user._id,
+      type: 'review',
+      title: 'New review',
+      body: `${req.user.name} left a ${rating}-star review on ${item.title}.`,
+      link: `/item/${itemId}`,
+      item: itemId,
     });
 
     await review.populate('user', 'name avatar');

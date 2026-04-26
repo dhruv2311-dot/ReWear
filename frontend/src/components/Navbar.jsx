@@ -1,18 +1,54 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
+import { useDebouncedCallback } from 'use-debounce';
 import {
   Leaf, Menu, X, Plus, User, LayoutDashboard,
-  LogOut, ShieldCheck, Bell, Search, ChevronDown
+  LogOut, ShieldCheck, Bell, Search, ChevronDown, Sparkles, MessageSquare
 } from 'lucide-react';
 
 const Navbar = () => {
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
+  const notificationsStore = useNotifications();
+  const notifications = notificationsStore?.notifications || [];
+  const unreadCount = notificationsStore?.unreadCount || 0;
+  const markRead = notificationsStore?.markRead;
+  const markAllRead = notificationsStore?.markAllRead;
   const [menuOpen, setMenuOpen] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const profileMenuRef = useRef(null);
+  const notificationMenuRef = useRef(null);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const debouncedSearch = useDebouncedCallback((value) => {
+    if (value.trim()) {
+      navigate(`/browse?search=${encodeURIComponent(value.trim())}`);
+    }
+  }, 350);
+
+  useEffect(() => {
+    setSearch(new URLSearchParams(location.search).get('search') || '');
+  }, [location.search]);
+
+  useEffect(() => {
+    const handleOutsideClick = (event) => {
+      const target = event.target;
+      if (notificationOpen && notificationMenuRef.current && !notificationMenuRef.current.contains(target)) {
+        setNotificationOpen(false);
+      }
+      if (dropdownOpen && profileMenuRef.current && !profileMenuRef.current.contains(target)) {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [dropdownOpen, notificationOpen]);
 
   const handleLogout = () => {
     logout();
@@ -25,6 +61,8 @@ const Navbar = () => {
     { label: 'How it Works', href: '/#how-it-works' },
     { label: 'Impact', href: '/#impact' },
   ];
+
+  const notificationPreview = useMemo(() => notifications.slice(0, 5), [notifications]);
 
   return (
     <nav className="navbar">
@@ -68,10 +106,123 @@ const Navbar = () => {
 
           {/* Right Side */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            {/* Search */}
-            <button onClick={() => navigate('/browse')} className="btn-ghost" style={{ padding: '0.5rem' }}>
-              <Search size={20} />
-            </button>
+            <div className="hidden-mobile" style={{ position: 'relative', minWidth: '280px', maxWidth: '360px' }}>
+              <Search size={16} style={{ position: 'absolute', left: '0.9rem', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }} />
+              <input
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  debouncedSearch(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    navigate(`/browse?search=${encodeURIComponent(search.trim())}`);
+                  }
+                }}
+                placeholder="Search items, tags, city"
+                className="input-field"
+                style={{ paddingLeft: '2.35rem', paddingTop: '0.65rem', paddingBottom: '0.65rem', borderRadius: '999px' }}
+              />
+            </div>
+
+            {isAuthenticated && (
+              <button
+                onClick={() => {
+                  navigate('/chats');
+                  setDropdownOpen(false);
+                  setNotificationOpen(false);
+                }}
+                className="btn-ghost"
+                style={{ padding: '0.55rem', position: 'relative' }}
+                title="Open chats"
+              >
+                <MessageSquare size={18} />
+              </button>
+            )}
+
+            {isAuthenticated && (
+              <div ref={notificationMenuRef} style={{ position: 'relative' }}>
+                <button
+                  onClick={() => {
+                    setNotificationOpen((open) => !open);
+                    setDropdownOpen(false);
+                  }}
+                  className="btn-ghost"
+                  style={{ padding: '0.55rem', position: 'relative' }}
+                >
+                  <Bell size={18} />
+                  {unreadCount > 0 && (
+                    <span style={{ position: 'absolute', top: '-2px', right: '-2px', minWidth: '18px', height: '18px', borderRadius: '999px', background: '#dc2626', color: 'white', fontSize: '0.7rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 4px' }}>
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                <AnimatePresence>
+                  {notificationOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                      style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 'min(360px, calc(100vw - 2rem))', background: 'white', border: '1px solid rgba(165,214,167,0.3)', borderRadius: '18px', boxShadow: '0 18px 40px rgba(15,23,42,0.12)', zIndex: 250, overflow: 'hidden' }}
+                    >
+                      <div style={{ padding: '1rem 1rem 0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem' }}>
+                        <div>
+                          <p style={{ fontWeight: 800, color: '#1a1a2e' }}>Notifications</p>
+                          <p style={{ fontSize: '0.8rem', color: '#6B7280' }}>{unreadCount} unread</p>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <button onClick={() => markAllRead?.()} className="btn-ghost" style={{ padding: '0.4rem 0.75rem', fontSize: '0.8rem' }}>
+                            Mark all read
+                          </button>
+                          <button
+                            onClick={() => setNotificationOpen(false)}
+                            className="btn-ghost"
+                            aria-label="Close notifications"
+                            style={{ padding: '0.35rem' }}
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      </div>
+                      <div style={{ maxHeight: '320px', overflow: 'auto' }}>
+                        {notificationPreview.length > 0 ? notificationPreview.map(notification => (
+                          <button
+                            key={notification._id}
+                            onClick={async () => {
+                              if (!notification.read) await markRead?.(notification._id);
+                              if (notification.link) navigate(notification.link);
+                              setNotificationOpen(false);
+                            }}
+                            style={{ width: '100%', textAlign: 'left', padding: '0.9rem 1rem', border: 'none', background: notification.read ? 'white' : 'rgba(27,94,32,0.05)', borderTop: '1px solid #F3F4F6', cursor: 'pointer' }}
+                          >
+                            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                              <div style={{ width: '38px', height: '38px', borderRadius: '12px', background: 'rgba(27,94,32,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                <Sparkles size={16} color="#1B5E20" />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <p style={{ fontWeight: 700, color: '#1a1a2e', fontSize: '0.88rem', marginBottom: '0.2rem' }}>{notification.title}</p>
+                                <p style={{ color: '#6B7280', fontSize: '0.8rem', lineHeight: 1.5 }}>{notification.body}</p>
+                              </div>
+                            </div>
+                          </button>
+                        )) : (
+                          <div style={{ padding: '1.5rem', textAlign: 'center', color: '#6B7280' }}>
+                            <Bell size={24} style={{ marginBottom: '0.5rem' }} />
+                            <p>No notifications yet</p>
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ padding: '0.9rem 1rem', borderTop: '1px solid #E5E7EB', background: '#FAFAFA' }}>
+                        <Link to="/notifications" onClick={() => setNotificationOpen(false)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem', color: '#1B5E20', fontWeight: 700, textDecoration: 'none', fontSize: '0.9rem' }}>
+                          View all notifications
+                        </Link>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
 
             {isAuthenticated ? (
               <>
@@ -82,9 +233,12 @@ const Navbar = () => {
                 </Link>
 
                 {/* User Dropdown */}
-                <div style={{ position: 'relative' }}>
+                <div ref={profileMenuRef} style={{ position: 'relative' }}>
                   <button
-                    onClick={() => setDropdownOpen(!dropdownOpen)}
+                    onClick={() => {
+                      setDropdownOpen((open) => !open);
+                      setNotificationOpen(false);
+                    }}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.75rem',
                       background: 'rgba(27,94,32,0.06)', border: '2px solid rgba(27,94,32,0.15)',
@@ -118,17 +272,29 @@ const Navbar = () => {
                       >
                         {/* User info */}
                         <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f3f4f6', marginBottom: '0.25rem' }}>
-                          <p style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1a1a2e' }}>{user?.name}</p>
-                          <p style={{ fontSize: '0.8rem', color: '#6B7280' }}>{user?.email}</p>
-                          <p style={{ fontSize: '0.8rem', color: '#4DB6AC', fontWeight: 600, marginTop: '0.25rem' }}>
-                            🌿 {user?.points} points
-                          </p>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                            <div>
+                              <p style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1a1a2e' }}>{user?.name}</p>
+                              <p style={{ fontSize: '0.8rem', color: '#6B7280' }}>{user?.email}</p>
+                              <p style={{ fontSize: '0.8rem', color: '#4DB6AC', fontWeight: 600, marginTop: '0.25rem' }}>
+                                🌿 {user?.points} points
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => setDropdownOpen(false)}
+                              className="btn-ghost"
+                              aria-label="Close profile menu"
+                              style={{ padding: '0.35rem' }}
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
                         </div>
 
                         {[
                           { icon: LayoutDashboard, label: 'Dashboard', to: '/dashboard' },
                           ...(isAdmin ? [{ icon: ShieldCheck, label: 'Admin Panel', to: '/admin' }] : []),
-                          { icon: User, label: 'My Profile', to: '/dashboard' },
+                          { icon: User, label: 'My Profile', to: '/profile' },
                         ].map(item => (
                           <Link key={item.to + item.label} to={item.to}
                             onClick={() => setDropdownOpen(false)}
@@ -196,6 +362,16 @@ const Navbar = () => {
                   {link.label}
                 </a>
               ))}
+              <div style={{ marginTop: '0.75rem' }}>
+                <Link to="/browse" onClick={() => setMenuOpen(false)} className="btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>Browse items</Link>
+              </div>
+              {isAuthenticated && (
+                <div style={{ marginTop: '0.75rem' }}>
+                  <Link to="/chats" onClick={() => setMenuOpen(false)} className="btn-secondary" style={{ width: '100%', justifyContent: 'center' }}>
+                    <MessageSquare size={16} /> Open chats
+                  </Link>
+                </div>
+              )}
               {!isAuthenticated && (
                 <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.75rem' }}>
                   <Link to="/login" onClick={() => setMenuOpen(false)} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>Sign In</Link>

@@ -2,6 +2,7 @@ const Item = require('../models/Item');
 const User = require('../models/User');
 const SustainabilityStats = require('../models/SustainabilityStats');
 const { uploadToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
+const { createNotification } = require('../utils/notifications');
 
 // ─── Create Item ──────────────────────────────────────────────────────────────
 exports.createItem = async (req, res, next) => {
@@ -41,6 +42,11 @@ exports.createItem = async (req, res, next) => {
     // Check for badges
     const user = await User.findById(req.user._id);
     await user.checkAndAwardBadges();
+
+    const ioItem = req.app.get('io');
+    if (ioItem) {
+      ioItem.to('admins').emit('item:created', item);
+    }
 
     res.status(201).json({ success: true, item });
   } catch (error) {
@@ -242,6 +248,16 @@ exports.updateItemStatus = async (req, res, next) => {
         { upsert: true }
       );
     }
+
+    await createNotification(req, {
+      recipient: item.owner._id,
+      actor: req.user._id,
+      type: 'item-status',
+      title: `Your item was ${status}`,
+      body: `${item.title} has been ${status} by the moderation team.`,
+      link: `/item/${item._id}`,
+      item: item._id,
+    });
 
     res.json({ success: true, item });
   } catch (error) {

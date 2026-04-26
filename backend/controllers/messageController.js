@@ -1,5 +1,6 @@
 const Message = require('../models/Message');
 const Swap = require('../models/Swap');
+const { createNotification } = require('../utils/notifications');
 
 // ─── Get Messages for a Swap ──────────────────────────────────────────────────
 exports.getMessages = async (req, res, next) => {
@@ -57,7 +58,19 @@ exports.sendMessage = async (req, res, next) => {
     const io = req.app.get('io');
     if (io) {
       io.to(swap.chatRoomId).emit('message:new', message);
+      io.to(swap.chatRoomId).emit('newMessage', message);
     }
+
+    const recipient = swap.requester.toString() === req.user._id.toString() ? swap.owner : swap.requester;
+    await createNotification(req, {
+      recipient,
+      actor: req.user._id,
+      type: 'message',
+      title: 'New message',
+      body: `${req.user.name} sent you a message.`,
+      link: `/chat/${swap._id}`,
+      swap: swap._id,
+    });
 
     res.status(201).json({ success: true, message });
   } catch (error) {
