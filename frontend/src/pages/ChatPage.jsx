@@ -11,7 +11,7 @@ const ChatPage = () => {
   const { swapId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { socket, joinRoom, leaveRoom, sendMessage: socketSend, markRead } = useSocket();
+  const { socket, joinRoom, leaveRoom } = useSocket();
   const [messages, setMessages] = useState([]);
   const [swap, setSwap] = useState(null);
   const [text, setText] = useState('');
@@ -48,8 +48,12 @@ const ChatPage = () => {
     if (!socket) return;
 
     const onMsg = (msg) => {
+      if (msg.sender?._id === user?._id) return;
       if (msg.swap === swapId || msg.swapId === swapId) {
-        setMessages(prev => [...prev, msg]);
+        setMessages((prev) => {
+          if (prev.some((entry) => entry._id === msg._id)) return prev;
+          return [...prev, msg];
+        });
         setOtherTyping(false);
       }
     };
@@ -62,16 +66,18 @@ const ChatPage = () => {
       if (uid !== user?._id) setOtherTyping(false);
     };
 
+    socket.on('message:new', onMsg);
     socket.on('newMessage', onMsg);
     socket.on('userTyping', onTyping);
     socket.on('userStopTyping', onStopTyping);
 
     return () => {
+      socket.off('message:new', onMsg);
       socket.off('newMessage', onMsg);
       socket.off('userTyping', onTyping);
       socket.off('userStopTyping', onStopTyping);
     };
-  }, [socket, swapId]);
+  }, [socket, swapId, user?._id]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });

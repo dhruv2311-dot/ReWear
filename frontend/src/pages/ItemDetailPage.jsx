@@ -35,7 +35,7 @@ const StarRating = ({ rating, interactive = false, onRate }) => {
 const ItemDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isAdmin } = useAuth();
   const [item, setItem] = useState(null);
   const [ownerItems, setOwnerItems] = useState([]);
   const [reviews, setReviews] = useState([]);
@@ -44,9 +44,13 @@ const ItemDetailPage = () => {
   const [swapModal, setSwapModal] = useState(false);
   const [swapType, setSwapType] = useState('points');
   const [swapMessage, setSwapMessage] = useState('');
+  const [offeredItemId, setOfferedItemId] = useState('');
+  const [myItems, setMyItems] = useState([]);
+  const [loadingMyItems, setLoadingMyItems] = useState(false);
   const [swapping, setSwapping] = useState(false);
   const [newReview, setNewReview] = useState({ rating: 0, comment: '' });
   const [submittingReview, setSubmittingReview] = useState(false);
+  const canOfferSwap = myItems.length > 0;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -70,14 +74,75 @@ const ItemDetailPage = () => {
     fetchData();
   }, [id]);
 
+  useEffect(() => {
+    if (!swapModal || swapType !== 'swap' || !isAuthenticated) return;
+    const loadMyItems = async () => {
+      setLoadingMyItems(true);
+      try {
+        const { data } = await itemService.getMyItems();
+        setMyItems((data.items || []).filter((entry) => entry._id !== id));
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setLoadingMyItems(false);
+      }
+    };
+    loadMyItems();
+  }, [swapModal, swapType, isAuthenticated, id]);
+
+  useEffect(() => {
+    if (!swapModal) {
+      setSwapMessage('');
+      setOfferedItemId('');
+      setMyItems([]);
+      setLoadingMyItems(false);
+    }
+  }, [swapModal]);
+
+  const openSwapModal = async (type) => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+
+    if (isAdmin) {
+      toast.error('Admin accounts cannot request swaps.');
+      return;
+    }
+
+    if (type === 'swap') {
+      try {
+        const { data } = await itemService.getMyItems();
+        const eligibleItems = (data.items || []).filter((entry) => entry._id !== id);
+        if (eligibleItems.length === 0) {
+          toast.error('Add at least one approved listing to request a swap.');
+          return;
+        }
+        setMyItems(eligibleItems);
+      } catch (error) {
+        toast.error('Failed to load your listings');
+        return;
+      }
+    }
+
+    setSwapType(type);
+    setSwapModal(true);
+  };
+
   const handleSwapRequest = async () => {
     if (!isAuthenticated) { navigate('/login'); return; }
     setSwapping(true);
     try {
-      await swapService.createSwap({ itemId: id, type: swapType, message: swapMessage });
+      await swapService.createSwap({
+        itemId: id,
+        type: swapType,
+        message: swapMessage,
+        offeredItemId: swapType === 'swap' ? offeredItemId : undefined,
+      });
       toast.success('Swap request sent successfully! 🎉');
       setSwapModal(false);
       setSwapMessage('');
+      setOfferedItemId('');
     } catch (e) {
       toast.error(e.response?.data?.message || 'Failed to send swap request');
     } finally {
@@ -236,13 +301,13 @@ const ItemDetailPage = () => {
             )}
 
             {/* Action buttons */}
-            {!isOwner && item.status === 'approved' && item.isAvailable && (
+            {!isOwner && !isAdmin && item.status === 'approved' && item.isAvailable && (
               <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
-                <button onClick={() => { setSwapType('swap'); setSwapModal(true); }}
+                <button onClick={() => openSwapModal('swap')}
                   className="btn-primary" style={{ flex: 1, justifyContent: 'center', padding: '0.9rem' }}>
                   <RefreshCw size={18} /> Request Swap
                 </button>
-                <button onClick={() => { setSwapType('points'); setSwapModal(true); }}
+                <button onClick={() => openSwapModal('points')}
                   className="btn-accent" style={{ flex: 1, justifyContent: 'center', padding: '0.9rem' }}>
                   <Coins size={18} /> Redeem with Points
                 </button>
@@ -252,6 +317,12 @@ const ItemDetailPage = () => {
             {isOwner && (
               <div style={{ background: 'rgba(27,94,32,0.08)', borderRadius: '14px', padding: '1rem', marginBottom: '1.5rem', textAlign: 'center', color: '#1B5E20', fontWeight: 600 }}>
                 ✅ This is your listing
+              </div>
+            )}
+
+            {isAdmin && (
+              <div style={{ background: 'rgba(59,130,246,0.08)', borderRadius: '14px', padding: '1rem', marginBottom: '1.5rem', textAlign: 'center', color: '#1D4ED8', fontWeight: 600 }}>
+                🛡️ Admin view only - swap requests are disabled
               </div>
             )}
 
@@ -356,15 +427,17 @@ const ItemDetailPage = () => {
       {swapModal && (
         <>
           <div className="overlay" onClick={() => setSwapModal(false)} />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            style={{
-              position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-              background: 'white', borderRadius: '24px', padding: '2rem',
-              width: 'min(500px, calc(100vw - 2rem))', zIndex: 300,
-              boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
-            }}>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'grid', placeItems: 'center', padding: '1rem' }}>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              style={{
+                background: 'white', borderRadius: '24px', padding: '2rem',
+                width: 'min(500px, calc(100vw - 2rem))',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                maxHeight: 'calc(100vh - 2rem)',
+                overflowY: 'auto',
+              }}>
             <h2 style={{ fontFamily: 'Poppins', fontWeight: 800, fontSize: '1.4rem', marginBottom: '0.5rem' }}>
               {swapType === 'points' ? '🌿 Redeem with Points' : '🔄 Request Swap'}
             </h2>
@@ -380,6 +453,97 @@ const ItemDetailPage = () => {
               </div>
             )}
 
+            {swapType === 'swap' && (
+              <div style={{ marginBottom: '1rem' }}>
+                <label style={{ fontWeight: 600, fontSize: '0.875rem', color: '#374151', display: 'block', marginBottom: '0.5rem' }}>Select one of your items to offer</label>
+                {loadingMyItems ? (
+                  <div className="skeleton" style={{ height: '140px', borderRadius: '18px' }} />
+                ) : canOfferSwap ? (
+                  <div style={{ display: 'grid', gap: '0.75rem' }}>
+                    {myItems.map((ownedItem) => {
+                      const selected = offeredItemId === ownedItem._id;
+                      return (
+                        <button
+                          key={ownedItem._id}
+                          type="button"
+                          onClick={() => setOfferedItemId(ownedItem._id)}
+                          style={{
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.9rem',
+                            padding: '0.8rem',
+                            borderRadius: '18px',
+                            border: `2px solid ${selected ? '#1B5E20' : '#E5E7EB'}`,
+                            background: selected ? 'rgba(27,94,32,0.05)' : 'white',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            transition: 'all 0.2s',
+                            boxShadow: selected ? '0 10px 24px rgba(27,94,32,0.10)' : 'none',
+                          }}
+                        >
+                          <img
+                            src={ownedItem.images?.[0]?.url || 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=400'}
+                            alt={ownedItem.title}
+                            style={{ width: '68px', height: '68px', borderRadius: '14px', objectFit: 'cover', flexShrink: 0, border: '1px solid rgba(0,0,0,0.06)' }}
+                          />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem' }}>
+                              <div style={{ minWidth: 0 }}>
+                                <p style={{ fontWeight: 800, color: '#1a1a2e', fontSize: '0.95rem', lineHeight: 1.4, marginBottom: '0.15rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {ownedItem.title}
+                                </p>
+                                <p style={{ color: '#6B7280', fontSize: '0.8rem', lineHeight: 1.4 }}>
+                                  {ownedItem.category} · {ownedItem.size} · {ownedItem.condition}
+                                </p>
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem', flexShrink: 0 }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1B5E20', background: 'rgba(27,94,32,0.10)', padding: '0.22rem 0.55rem', borderRadius: '999px' }}>
+                                  🌿 {ownedItem.pointsValue}
+                                </span>
+                                {selected && (
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#ffffff', background: '#1B5E20', padding: '0.2rem 0.5rem', borderRadius: '999px' }}>
+                                    Selected
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.55rem' }}>
+                              <span className="tag" style={{ margin: 0 }}>{ownedItem.status}</span>
+                              <span className="tag" style={{ margin: 0 }}>{ownedItem.type}</span>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+
+                    {offeredItemId && (
+                      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '0.25rem' }}>
+                        <div style={{ width: '100%', maxWidth: '420px', background: 'rgba(27,94,32,0.06)', border: '1px solid rgba(27,94,32,0.18)', borderRadius: '16px', padding: '0.85rem', display: 'flex', gap: '0.75rem', alignItems: 'center', boxShadow: '0 10px 20px rgba(27,94,32,0.08)' }}>
+                          <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(27,94,32,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <BadgeCheck size={18} color="#1B5E20" />
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <p style={{ fontWeight: 800, color: '#1a1a2e', fontSize: '0.9rem', marginBottom: '0.15rem' }}>
+                              {myItems.find((entry) => entry._id === offeredItemId)?.title}
+                            </p>
+                            <p style={{ color: '#6B7280', fontSize: '0.8rem' }}>
+                              This item will be offered in your swap request.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.28)', borderRadius: '12px', padding: '0.85rem', color: '#b45309', fontSize: '0.875rem', lineHeight: 1.6 }}>
+                    You need at least one approved listing to request a swap.
+                  </div>
+                )}
+              </div>
+            )}
+
             <div style={{ marginBottom: '1rem' }}>
               <label style={{ fontWeight: 600, fontSize: '0.875rem', color: '#374151', display: 'block', marginBottom: '0.5rem' }}>Message (optional)</label>
               <textarea className="input-field" rows={3} placeholder="Add a message to the owner..."
@@ -388,12 +552,13 @@ const ItemDetailPage = () => {
 
             <div style={{ display: 'flex', gap: '0.75rem' }}>
               <button onClick={() => setSwapModal(false)} className="btn-secondary" style={{ flex: 1, justifyContent: 'center' }}>Cancel</button>
-              <button onClick={handleSwapRequest} className="btn-primary" disabled={swapping || (swapType === 'points' && user?.points < item.pointsValue)}
+              <button onClick={handleSwapRequest} className="btn-primary" disabled={swapping || (swapType === 'points' && user?.points < item.pointsValue) || (swapType === 'swap' && !offeredItemId)}
                 style={{ flex: 1, justifyContent: 'center' }}>
                 {swapping ? <div className="spinner" style={{ width: '18px', height: '18px', borderWidth: '2px' }} /> : 'Send Request'}
               </button>
             </div>
-          </motion.div>
+            </motion.div>
+          </div>
         </>
       )}
     </div>

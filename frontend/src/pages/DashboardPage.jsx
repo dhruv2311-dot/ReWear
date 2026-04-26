@@ -149,7 +149,7 @@ const DashboardPage = () => {
                 <div className="card" style={{ padding: '1.75rem' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
                     <h2 style={{ fontFamily: 'Poppins', fontWeight: 700, fontSize: '1.1rem', color: '#1a1a2e' }}>Profile Info</h2>
-                    <Link to="/profile/edit" className="btn-ghost" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}>
+                    <Link to="/edit-profile" className="btn-ghost" style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}>
                       <Settings size={14} /> Edit
                     </Link>
                   </div>
@@ -251,76 +251,82 @@ const DashboardPage = () => {
             {/* ─── MY SWAPS TAB ─────────────────────────────────────────── */}
             {activeTab === 'My Swaps' && (
               <div>
-                <h2 style={{ fontFamily: 'Poppins', fontWeight: 700, fontSize: '1.2rem', marginBottom: '1.5rem' }}>
-                  My Swaps ({swaps.length})
-                </h2>
                 {loadingSwaps ? (
                   <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}><div className="spinner" /></div>
-                ) : swaps.length > 0 ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {swaps.map(swap => {
-                      const iAmRequester = swap.requester?._id === user?._id;
-                      const other = iAmRequester ? swap.owner : swap.requester;
-                      return (
-                        <motion.div key={swap._id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-                          className="card" style={{ padding: '1.25rem' }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
-                            <img src={swap.item?.images?.[0]?.url} alt="" style={{ width: '60px', height: '60px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }} />
-                            <div style={{ flex: 1, minWidth: '200px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                                <p style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1a1a2e' }}>{swap.item?.title}</p>
-                                {statusBadge(swap.status)}
-                              </div>
-                              <p style={{ fontSize: '0.8rem', color: '#6B7280' }}>
-                                {iAmRequester ? `You → ${other?.name}` : `${other?.name} → You`} ·
-                                {swap.type === 'points' ? ` 🌿 ${swap.pointsOffered} pts` : ' 🔄 Item swap'}
-                              </p>
-                              <p style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: '0.2rem' }}>
-                                {new Date(swap.createdAt).toLocaleDateString()}
-                              </p>
-                            </div>
-                            <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
-                              {/* Owner actions on pending swap */}
-                              {!iAmRequester && swap.status === 'pending' && (
-                                <>
-                                  <button onClick={() => onSwapAction(swap._id, 'accepted')}
-                                    style={{ padding: '0.5rem 1rem', background: '#1B5E20', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                    <CheckCircle size={14} /> Accept
-                                  </button>
-                                  <button onClick={() => onSwapAction(swap._id, 'rejected')}
-                                    style={{ padding: '0.5rem 1rem', background: 'rgba(239,68,68,0.1)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                                    <XCircle size={14} /> Reject
-                                  </button>
-                                </>
-                              )}
-                              {/* Mark complete on accepted */}
-                              {swap.status === 'accepted' && (
-                                <button onClick={() => onSwapAction(swap._id, 'completed')}
-                                  style={{ padding: '0.5rem 1rem', background: '#4DB6AC', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 }}>
-                                  Mark Complete
-                                </button>
-                              )}
-                              {/* Chat */}
-                              {['pending', 'accepted'].includes(swap.status) && (
-                                <Link to={`/chat/${swap._id}`}
-                                  style={{ padding: '0.5rem 0.75rem', background: 'rgba(27,94,32,0.08)', color: '#1B5E20', border: '1px solid rgba(27,94,32,0.25)', borderRadius: '8px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8rem', fontWeight: 700 }}>
-                                  <MessageSquare size={14} /> Chat
-                                </Link>
-                              )}
-                            </div>
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div style={{ textAlign: 'center', padding: '4rem' }}>
-                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔄</div>
-                    <h3 style={{ fontWeight: 700, marginBottom: '0.5rem' }}>No swaps yet</h3>
-                    <p style={{ color: '#6B7280', marginBottom: '1.5rem' }}>Browse items and request your first swap!</p>
-                    <Link to="/browse" className="btn-primary">Browse Items</Link>
-                  </div>
-                )}
+                ) : (() => {
+                  const incoming = swaps.filter(swap => swap.owner?._id === user?._id);
+                  const outgoing = swaps.filter(swap => swap.requester?._id === user?._id);
+
+                  const renderSection = (title, list, emptyTitle, emptyBody) => (
+                    <section style={{ marginBottom: '2rem' }}>
+                      <h2 style={{ fontFamily: 'Poppins', fontWeight: 700, fontSize: '1.15rem', marginBottom: '1rem' }}>
+                        {title} ({list.length})
+                      </h2>
+                      {list.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                          {list.map(swap => {
+                            const iAmRequester = swap.requester?._id === user?._id;
+                            const other = iAmRequester ? swap.owner : swap.requester;
+                            return (
+                              <motion.div key={swap._id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="card" style={{ padding: '1.25rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                                  <img src={swap.item?.images?.[0]?.url} alt="" style={{ width: '60px', height: '60px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }} />
+                                  <div style={{ flex: 1, minWidth: '200px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                                      <p style={{ fontWeight: 700, fontSize: '0.95rem', color: '#1a1a2e' }}>{swap.item?.title}</p>
+                                      {statusBadge(swap.status)}
+                                    </div>
+                                    <p style={{ fontSize: '0.8rem', color: '#6B7280' }}>
+                                      {iAmRequester ? `You → ${other?.name}` : `${other?.name} → You`} ·
+                                      {swap.type === 'points' ? ` 🌿 ${swap.pointsOffered} pts` : ' 🔄 Item swap'}
+                                    </p>
+                                    <p style={{ fontSize: '0.75rem', color: '#9CA3AF', marginTop: '0.2rem' }}>
+                                      {new Date(swap.createdAt).toLocaleDateString()}
+                                    </p>
+                                  </div>
+                                  <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0, flexWrap: 'wrap' }}>
+                                    {!iAmRequester && swap.status === 'pending' && (
+                                      <>
+                                        <button onClick={() => onSwapAction(swap._id, 'accepted')} style={{ padding: '0.5rem 1rem', background: '#1B5E20', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                          <CheckCircle size={14} /> Accept
+                                        </button>
+                                        <button onClick={() => onSwapAction(swap._id, 'rejected')} style={{ padding: '0.5rem 1rem', background: 'rgba(239,68,68,0.1)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                          <XCircle size={14} /> Reject
+                                        </button>
+                                      </>
+                                    )}
+                                    {swap.status === 'accepted' && (
+                                      <button onClick={() => onSwapAction(swap._id, 'completed')} style={{ padding: '0.5rem 1rem', background: '#4DB6AC', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 }}>
+                                        Mark Complete
+                                      </button>
+                                    )}
+                                    {['pending', 'accepted'].includes(swap.status) && (
+                                      <Link to={`/chat/${swap._id}`} style={{ padding: '0.5rem 0.75rem', background: 'rgba(27,94,32,0.08)', color: '#1B5E20', border: '1px solid rgba(27,94,32,0.25)', borderRadius: '8px', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.8rem', fontWeight: 700 }}>
+                                        <MessageSquare size={14} /> Chat
+                                      </Link>
+                                    )}
+                                  </div>
+                                </div>
+                              </motion.div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div style={{ textAlign: 'center', padding: '2rem', background: '#fff', borderRadius: '16px', border: '1px dashed #E5E7EB' }}>
+                          <h3 style={{ fontWeight: 700, marginBottom: '0.5rem' }}>{emptyTitle}</h3>
+                          <p style={{ color: '#6B7280' }}>{emptyBody}</p>
+                        </div>
+                      )}
+                    </section>
+                  );
+
+                  return (
+                    <div>
+                      {renderSection('Incoming Requests', incoming, 'No incoming swap requests', 'Incoming requests from other users will appear here.')}
+                      {renderSection('Outgoing Requests', outgoing, 'No outgoing swap requests', 'The swaps you request will show up here.')}
+                    </div>
+                  );
+                })()}
               </div>
             )}
 

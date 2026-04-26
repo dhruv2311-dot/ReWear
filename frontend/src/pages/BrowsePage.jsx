@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Filter, SlidersHorizontal, X, ChevronDown, MapPin } from 'lucide-react';
+import { Search, Filter, SlidersHorizontal, X, ChevronDown, MapPin, LoaderCircle } from 'lucide-react';
 import ItemCard from '../components/ItemCard';
 import { itemService } from '../services/api';
 import { useDebouncedCallback } from 'use-debounce';
@@ -24,6 +24,8 @@ const BrowsePage = () => {
   const [loading, setLoading] = useState(true);
   const [pagination, setPagination] = useState({ total: 0, page: 1, pages: 1 });
   const [showFilters, setShowFilters] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadMoreRef = useRef(null);
   const [filters, setFilters] = useState({
     search: searchParams.get('search') || '',
     category: searchParams.get('category') || 'All',
@@ -37,8 +39,13 @@ const BrowsePage = () => {
     page: 1,
   });
 
-  const fetchItems = useCallback(async (overrides = {}) => {
-    setLoading(true);
+  const fetchItems = useCallback(async (overrides = {}, options = {}) => {
+    const { append = false } = options;
+    if (append) {
+      setLoadingMore(true);
+    } else {
+      setLoading(true);
+    }
     const params = { ...filters, ...overrides };
     const query = {};
     if (params.category !== 'All') query.category = params.category;
@@ -55,18 +62,31 @@ const BrowsePage = () => {
 
     try {
       const { data } = await itemService.getItems(query);
-      setItems(data.items || []);
+      setItems(prev => append ? [...prev, ...(data.items || [])] : (data.items || []));
       setPagination(data.pagination || {});
     } catch (e) {
       console.error(e);
     } finally {
-      setLoading(false);
+      if (append) {
+        setLoadingMore(false);
+      } else {
+        setLoading(false);
+      }
     }
   }, [filters]);
 
   const debouncedFetch = useDebouncedCallback(() => fetchItems(), 400);
 
-  useEffect(() => { fetchItems(); }, []);
+  useEffect(() => {
+    const nextFilters = {
+      ...filters,
+      search: searchParams.get('search') || '',
+      category: searchParams.get('category') || 'All',
+      page: 1,
+    };
+    setFilters(nextFilters);
+    fetchItems(nextFilters);
+  }, [searchParams.toString()]);
 
   const updateFilter = (key, value) => {
     const updated = { ...filters, [key]: value, page: 1 };
@@ -84,6 +104,31 @@ const BrowsePage = () => {
     filters.category !== 'All', filters.size !== 'All', filters.condition !== 'All',
     filters.type !== 'All', filters.city, filters.minPoints, filters.maxPoints,
   ].filter(Boolean).length;
+
+  const handleLoadMore = useCallback(() => {
+    if (loading || loadingMore) return;
+    if (!pagination.pages || pagination.page >= pagination.pages) return;
+    const nextPage = (pagination.page || filters.page || 1) + 1;
+    const nextFilters = { ...filters, page: nextPage };
+    setFilters(nextFilters);
+    fetchItems(nextFilters, { append: true });
+  }, [loading, loadingMore, pagination.page, pagination.pages, filters, fetchItems]);
+
+  useEffect(() => {
+    const observerTarget = loadMoreRef.current;
+    if (!observerTarget) return undefined;
+    if (loading || loadingMore) return undefined;
+    if (!pagination.pages || pagination.page >= pagination.pages) return undefined;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0]?.isIntersecting) {
+        handleLoadMore();
+      }
+    }, { rootMargin: '200px' });
+
+    observer.observe(observerTarget);
+    return () => observer.disconnect();
+  }, [handleLoadMore, loading, loadingMore, pagination.page, pagination.pages, items.length]);
 
   return (
     <div style={{ minHeight: '100vh', background: '#F5F5F5' }}>
@@ -248,20 +293,9 @@ const BrowsePage = () => {
               {items.map((item, i) => <ItemCard key={item._id} item={item} index={i} />)}
             </div>
 
-            {/* Pagination */}
-            {pagination.pages > 1 && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '3rem' }}>
-                {[...Array(pagination.pages)].map((_, i) => {
-                  const page = i + 1;
-                  return (
-                    <button key={page} onClick={() => updateFilter('page', page)}
-                      style={{ width: '40px', height: '40px', borderRadius: '10px', border: `2px solid ${filters.page === page ? '#1B5E20' : '#E5E7EB'}`, background: filters.page === page ? '#1B5E20' : 'white', color: filters.page === page ? 'white' : '#374151', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem', transition: 'all 0.2s' }}>
-                      {page}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            <div ref={loadMoreRef} style={{ display: 'flex', justifyContent: 'center', marginTop: '2rem', minHeight: '64px' }}>
+              {loadingMore && <LoaderCircle size={24} className="spin" color="#1B5E20" />}
+            </div>
           </>
         ) : (
           <div style={{ textAlign: 'center', padding: '5rem 2rem' }}>

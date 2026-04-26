@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import {
   Users, Package, RefreshCw, ShieldCheck, TrendingUp,
   Check, X, Ban, Eye, ChevronDown, Search, Leaf, Droplets, Wind
 } from 'lucide-react';
-import { adminService } from '../services/api';
+import { adminService, itemService } from '../services/api';
 import toast from 'react-hot-toast';
 
 const StatCard = ({ icon: Icon, label, value, color, sub }) => (
@@ -51,7 +52,7 @@ const AdminPanel = () => {
     }
     if (activeTab === 'Swaps') {
       setLoading(true);
-      adminService.getSustainabilityStats().then(r => {}).finally(() => setLoading(false));
+      adminService.getAllSwaps().then(r => setSwaps(r.data.swaps || [])).finally(() => setLoading(false));
     }
   }, [activeTab]);
 
@@ -73,6 +74,18 @@ const AdminPanel = () => {
       toast.success(data.message);
     } catch (e) {
       toast.error('Action failed');
+    }
+  };
+
+  const handleDeleteItem = async (itemId) => {
+    if (!window.confirm('Delete this item permanently?')) return;
+    try {
+      await itemService.deleteItem(itemId);
+      setAllItems(prev => prev.filter(item => item._id !== itemId));
+      setPendingItems(prev => prev.filter(item => item._id !== itemId));
+      toast.success('Item deleted');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Delete failed');
     }
   };
 
@@ -240,6 +253,7 @@ const AdminPanel = () => {
                                     <button onClick={() => handleItemStatus(item._id, 'rejected')} style={{ padding: '0.35rem 0.75rem', background: 'rgba(239,68,68,0.1)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}>Reject</button>
                                   </>
                                 )}
+                                <button onClick={() => handleDeleteItem(item._id)} style={{ padding: '0.35rem 0.75rem', background: 'rgba(239,68,68,0.1)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}>Delete</button>
                               </div>
                             </td>
                           </tr>
@@ -313,6 +327,40 @@ const AdminPanel = () => {
                       </tbody>
                     </table>
                   </div>
+                )}
+              </div>
+            )}
+
+            {/* ─── SWAPS ────────────────────────────────────────────────── */}
+            {activeTab === 'Swaps' && (
+              <div>
+                <h2 style={{ fontFamily: 'Poppins', fontWeight: 700, fontSize: '1.2rem', marginBottom: '1.5rem' }}>
+                  All Swaps ({swaps.length})
+                </h2>
+                {loading ? <div style={{ textAlign: 'center', padding: '3rem' }}><div className="spinner" style={{ margin: '0 auto' }} /></div> : swaps.length > 0 ? (
+                  <div style={{ display: 'grid', gap: '1rem' }}>
+                    {swaps.map((swap) => (
+                      <div key={swap._id} className="card" style={{ padding: '1rem 1.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                          <img src={swap.item?.images?.[0]?.url} alt="" style={{ width: '56px', height: '56px', borderRadius: '14px', objectFit: 'cover' }} />
+                          <div style={{ flex: 1, minWidth: '220px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                              <p style={{ fontWeight: 700, color: '#1a1a2e' }}>{swap.item?.title}</p>
+                              <span style={{ padding: '0.2rem 0.6rem', borderRadius: '999px', background: `${statusColor[swap.status] || '#6b7280'}15`, color: statusColor[swap.status] || '#6b7280', fontSize: '0.75rem', fontWeight: 700 }}>{swap.status}</span>
+                            </div>
+                            <p style={{ color: '#6B7280', fontSize: '0.85rem' }}>
+                              {swap.requester?.name} → {swap.owner?.name} · {swap.type === 'points' ? `🌿 ${swap.pointsOffered} pts` : 'Swap'}
+                            </p>
+                          </div>
+                          <Link to={`/admin/swaps/${swap._id}`} className="btn-secondary" style={{ padding: '0.5rem 0.9rem' }}>
+                            <Eye size={14} /> View Chat
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="card" style={{ padding: '1.5rem', color: '#6B7280' }}>No swaps to monitor yet.</div>
                 )}
               </div>
             )}
