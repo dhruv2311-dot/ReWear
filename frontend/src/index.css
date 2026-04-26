@@ -461,3 +461,137 @@ h1, h2, h3, h4, h5, h6 {
 .spin {
   animation: spin 1s linear infinite;
 }
+
+.hidden-mobile {
+  display: initial;
+}
+
+.show-mobile {
+  display: none !important;
+}
+
+@media (max-width: 768px) {
+  .hidden-mobile {
+    display: none !important;
+  }
+
+  .show-mobile {
+    display: inline-flex !important;
+  }
+
+  .container-main {
+    padding: 0 1rem;
+  }
+
+  .items-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1rem;
+  }
+
+  /* Mobile-specific utilities */
+  .mobile-full-width {
+    width: 100% !important;
+  }
+
+  .mobile-center {
+    text-align: center !important;
+    justify-content: center !important;
+  }
+
+  .mobile-stack {
+    flex-direction: column !important;
+  }
+
+  .mobile-gap-2 {
+    gap: 0.5rem !important;
+  }
+
+  .mobile-gap-4 {
+    gap: 1rem !important;
+  }
+
+  .mobile-p-2 {
+    padding: 0.5rem !important;
+  }
+
+  .mobile-p-4 {
+    padding: 1rem !important;
+  }
+
+  .mobile-text-sm {
+    font-size: 0.875rem !important;
+  }
+
+  .mobile-text-xs {
+    font-size: 0.75rem !important;
+  }
+
+  .mobile-hidden {
+    display: none !important;
+  }
+
+  .mobile-block {
+    display: block !important;
+  }
+
+  .mobile-flex {
+    display: flex !important;
+  }
+}
+
+/* Tablet breakpoint */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .tablet-hidden {
+    display: none !important;
+  }
+
+  .tablet-stack {
+    flex-direction: column !important;
+  }
+
+  .container-main {
+    padding: 0 1.25rem;
+  }
+
+  .items-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1.25rem;
+  }
+}
+
+/* Large desktop */
+@media (min-width: 1280px) {
+  .container-main {
+    max-width: 1400px;
+  }
+}
+
+/* Skeleton Loading Animations */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: 4px;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-card:hover,
+.skeleton-item:hover,
+.skeleton-chat:hover {
+  transform: none;
+  cursor: default;
+}
+
+.skeleton-card:active,
+.skeleton-item:active,
+.skeleton-chat:active {
+  transform: none;
+}

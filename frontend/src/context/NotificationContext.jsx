@@ -71,6 +71,12 @@ export const NotificationProvider = ({ children }) => {
     setUnreadCount(0);
   };
 
+  const markUnread = async (id) => {
+    await notificationService.markUnread(id);
+    setNotifications(prev => prev.map(notification => notification._id === id ? { ...notification, read: false } : notification));
+    setUnreadCount(prev => prev + 1);
+  };
+
   const value = useMemo(() => ({
     notifications,
     unreadCount,
@@ -79,6 +85,7 @@ export const NotificationProvider = ({ children }) => {
     refresh,
     markRead,
     markAllRead,
+    markUnread,
   }), [notifications, unreadCount, loading, error]);
 
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;

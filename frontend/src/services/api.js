@@ -41,7 +41,10 @@ export const authService = {
   login: (data) => api.post('/auth/login', data),
   getMe: () => api.get('/auth/me'),
   logout: () => api.post('/auth/logout'),
-  updateProfile: (data) => api.put('/auth/profile', data),
+  updateProfile: (data, onUploadProgress) => api.put('/auth/profile', data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress
+  }),
   forgotPassword: (data) => api.post('/auth/forgot-password', data),
   resetPassword: (token, data) => api.post(`/auth/reset-password/${token}`, data),
 };
@@ -52,9 +55,15 @@ export const itemService = {
   getItem: (id) => api.get(`/items/${id}`),
   getFeatured: () => api.get('/items/featured'),
   getMyItems: () => api.get('/items/user/my'),
-  createItem: (formData) =>
-    api.post('/items', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
-  updateItem: (id, data) => api.put(`/items/${id}`, data),
+  createItem: (formData, onUploadProgress) =>
+    api.post('/items', formData, { 
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress 
+    }),
+  updateItem: (id, data, onUploadProgress) => api.put(`/items/${id}`, data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress
+  }),
   deleteItem: (id) => api.delete(`/items/${id}`),
   updateStatus: (id, status) => api.patch(`/items/${id}/status`, { status }),
 };
@@ -63,6 +72,7 @@ export const itemService = {
 export const swapService = {
   createSwap: (data) => api.post('/swaps', data),
   getMySwaps: () => api.get('/swaps/my'),
+  getMyPurchases: () => api.get('/swaps/my/purchases'),
   getSwap: (id) => api.get(`/swaps/${id}`),
   updateStatus: (id, status) => api.patch(`/swaps/${id}/status`, { status }),
   getAllSwaps: (params) => api.get('/swaps/admin/all', { params }),
@@ -85,6 +95,7 @@ export const messageService = {
 export const notificationService = {
   getMyNotifications: () => api.get('/notifications'),
   markRead: (id) => api.patch(`/notifications/${id}/read`),
+  markUnread: (id) => api.patch(`/notifications/${id}/unread`),
   markAllRead: () => api.patch('/notifications/read-all'),
 };
 
@@ -93,12 +104,15 @@ export const statsService = {
   getSustainabilityStats: () => api.get('/items/stats/sustainability'),
 };
 
-// ─── Admin Services ────────────────────────────────────────────────────────
+// ─── Admin Services ────────────────────────────────────────────────
 export const adminService = {
   getStats: () => api.get('/admin/stats'),
   getUsers: (params) => api.get('/admin/users', { params }),
+  getUserActivity: (id) => api.get(`/admin/users/${id}/activity`),
   toggleBan: (id) => api.patch(`/admin/users/${id}/ban`),
+  getAllSwaps: (params) => api.get('/swaps/admin/all', { params }),
   getItems: (params) => api.get('/admin/items', { params }),
+  getDashboardStats: () => api.get('/admin/stats'),
   getPendingItems: () => api.get('/admin/items/pending'),
   approveItem: (id, status) => api.patch(`/admin/items/${id}/status`, { status }),
   getSustainabilityStats: () => api.get('/admin/sustainability'),

@@ -16,6 +16,7 @@ const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const BrowsePage = lazy(() => import('./pages/BrowsePage'));
 const ItemDetailPage = lazy(() => import('./pages/ItemDetailPage'));
 const AddItemPage = lazy(() => import('./pages/AddItemPage'));
+const EditItemPage = lazy(() => import('./pages/EditItemPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const ChatPage = lazy(() => import('./pages/ChatPage'));
 const AdminPanel = lazy(() => import('./pages/AdminPanel'));
@@ -25,6 +26,7 @@ const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'));
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 const AdminSwapDetailPage = lazy(() => import('./pages/AdminSwapDetailPage'));
+const UserActivityPage = lazy(() => import('./pages/UserActivityPage'));
 const ChatsPage = lazy(() => import('./pages/ChatsPage'));
 
 // Loading fallback
@@ -110,6 +112,12 @@ function App() {
                 </ProtectedRoute>
               } />
 
+              <Route path="/edit-item/:id" element={
+                <ProtectedRoute>
+                  <MainLayout><EditItemPage /></MainLayout>
+                </ProtectedRoute>
+              } />
+
               <Route path="/dashboard" element={
                 <ProtectedRoute>
                   <MainLayout><DashboardPage /></MainLayout>
@@ -149,6 +157,12 @@ function App() {
               <Route path="/admin/swaps/:swapId" element={
                 <AdminRoute>
                   <MainLayout><AdminSwapDetailPage /></MainLayout>
+                </AdminRoute>
+              } />
+
+              <Route path="/admin/users/:id/activity" element={
+                <AdminRoute>
+                  <MainLayout><UserActivityPage /></MainLayout>
                 </AdminRoute>
               } />
 

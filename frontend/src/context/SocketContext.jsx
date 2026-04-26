@@ -11,13 +11,23 @@ export const SocketProvider = ({ children }) => {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
+    if (!token) {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        setSocket(null);
+        setConnected(false);
+      }
+      return;
+    }
+
     const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
     const nextSocket = io(SOCKET_URL, {
       auth: { token },
       transports: ['websocket', 'polling'],
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
     });
 
     socketRef.current = nextSocket;
