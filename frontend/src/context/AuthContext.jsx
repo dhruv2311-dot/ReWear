@@ -41,8 +41,10 @@ export const AuthProvider = ({ children }) => {
       const { data } = await authService.getMe();
       setUser(data.user);
       localStorage.setItem('rewear_user', JSON.stringify(data.user));
+      return data.user;
     } catch (e) {
       console.error(e);
+      return null;
     }
   }, []);
 

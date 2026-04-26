@@ -17,8 +17,8 @@ const LoginPage = () => {
     setError('');
     setLoading(true);
     try {
-      await login(form.email, form.password);
-      navigate('/dashboard');
+      const data = await login(form.email, form.password);
+      navigate(data?.user?.role === 'admin' ? '/admin' : '/dashboard');
     } catch (err) {
       setError(err.response?.data?.message || 'Invalid credentials. Please try again.');
     } finally {
@@ -105,6 +105,12 @@ const LoginPage = () => {
               {loading ? <div className="spinner" style={{ width: '20px', height: '20px', borderWidth: '2px' }} /> : 'Sign In'}
             </button>
           </form>
+
+          <div style={{ textAlign: 'right', marginTop: '0.75rem' }}>
+            <Link to="/forgot-password" style={{ color: '#1B5E20', fontWeight: 700, fontSize: '0.88rem', textDecoration: 'none' }}>
+              Forgot password?
+            </Link>
+          </div>
 
           {/* Divider */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', margin: '1.5rem 0' }}>

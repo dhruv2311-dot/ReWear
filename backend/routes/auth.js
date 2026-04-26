@@ -3,6 +3,7 @@ const passport = require('passport');
 const router = express.Router();
 const {
   register, login, getMe, oauthCallback, logout, updateProfile,
+  forgotPassword, resetPassword,
 } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 const { upload } = require('../config/cloudinary');
@@ -13,6 +14,8 @@ router.post('/login', login);
 router.get('/me', protect, getMe);
 router.post('/logout', protect, logout);
 router.put('/profile', protect, upload.single('avatar'), updateProfile);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password/:token', resetPassword);
 
 // Google OAuth
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));

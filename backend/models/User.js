@@ -72,6 +72,8 @@ const userSchema = new mongoose.Schema(
       maxlength: [200, 'Bio cannot exceed 200 characters'],
       default: '',
     },
+    resetPasswordToken: String,
+    resetPasswordExpire: Date,
     totalItemsReused: { type: Number, default: 0 },
     totalWaterSaved: { type: Number, default: 0 }, // liters
     totalCarbonSaved: { type: Number, default: 0 }, // kg
