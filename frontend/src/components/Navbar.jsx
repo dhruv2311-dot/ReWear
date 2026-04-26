@@ -355,6 +355,26 @@ const Navbar = () => {
               exit={{ height: 0, opacity: 0 }}
               style={{ overflow: 'hidden', borderTop: '1px solid rgba(165,214,167,0.3)', paddingBottom: '1rem' }}
             >
+              <div style={{ position: 'relative', marginTop: '0.75rem' }}>
+                <Search size={16} style={{ position: 'absolute', left: '0.9rem', top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF' }} />
+                <input
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    debouncedSearch(e.target.value);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      navigate(`/browse?search=${encodeURIComponent(search.trim())}`);
+                      setMenuOpen(false);
+                    }
+                  }}
+                  placeholder="Search items, tags, city"
+                  className="input-field"
+                  style={{ paddingLeft: '2.35rem', paddingTop: '0.65rem', paddingBottom: '0.65rem', borderRadius: '999px' }}
+                />
+              </div>
+
               {navLinks.map(link => (
                 <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)}
                   style={{ display: 'block', padding: '0.75rem 0.5rem', textDecoration: 'none', color: '#374151', fontWeight: 500 }}
@@ -382,15 +402,6 @@ const Navbar = () => {
           )}
         </AnimatePresence>
       </div>
-
-      <style>{`
-        @media (max-width: 768px) {
-          .hidden-mobile { display: none !important; }
-        }
-        @media (min-width: 769px) {
-          .show-mobile { display: none !important; }
-        }
-      `}</style>
     </nav>
   );
 };
