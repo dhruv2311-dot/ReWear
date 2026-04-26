@@ -7,6 +7,17 @@ This is the React-based frontend for the ReWear platform. Built with a focus on 
 - **Fluid Transitions**: Seamless page and component animations using Framer Motion.
 - **Real-time Updates**: Live chat and notifications via Socket.io integration.
 - **Responsive Design**: Fully optimized for mobile, tablet, and desktop views.
+- **Auth Experience**: Local login/register + Google/GitHub OAuth + protected/admin routes.
+- **Profile Suite**: Profile page, edit profile form, forgot password, and reset password pages.
+- **Notification Center**: Bell panel + dedicated notifications page with mark read actions.
+- **Chats Inbox**: WhatsApp-like chats page with avatar, last message preview, and quick open.
+
+## 🆕 Latest Frontend Additions
+- Added `ChatsPage` route and navbar chat entry for direct conversation access.
+- Added `NotificationContext` and `ChatContext` for shared real-time state.
+- Added `AdminSwapDetailPage` for admin moderation flow.
+- Upgraded browse/dashboard/item/chat screens with loading and UX refinements.
+- Improved OAuth success auth hydration and role-based redirects.
 
 ## 🛠️ Tech Stack
 - **Library**: React 19

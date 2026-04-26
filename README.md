@@ -15,9 +15,23 @@
 - **✨ Smart Marketplace**: Curated listing of clothing items with detailed descriptions and high-quality images.
 - **💬 Real-time Messaging**: Instant communication between traders via Socket.io for seamless negotiation.
 - **🔐 Secure Auth**: Robust authentication system supporting local accounts and OAuth integration (Google & GitHub).
+- **👤 Account Management**: Profile page, edit profile, forgot password, and reset password flows.
+- **🔔 Notification Center**: In-app notifications with unread tracking, mark-as-read, and live socket updates.
+- **🧵 Chat Inbox**: WhatsApp-style chats list with avatar, last message preview, and quick access to room chat.
 - **🛡️ Admin Suite**: Specialized dashboard for platform administrators to manage users, items, and reports.
 - **⚡ Premium UI**: High-performance, responsive interface built with Tailwind CSS 4 and fluid Framer Motion animations.
 - **⭐ Trust & Safety**: Integrated review system to build a reliable community of traders.
+
+---
+
+## 🆕 Recently Implemented
+
+- **Google avatar sync improvements**: Existing and new Google OAuth users now get profile photo synchronization more reliably.
+- **Password recovery with SMTP**: Backend now supports password reset email flow using SMTP configuration.
+- **Dedicated notifications module**: New notification model, APIs, and socket delivery path integrated across swap/message/review events.
+- **Role-safe admin swap view**: Added admin-specific swap detail view for safe moderation and chat inspection.
+- **Chats entrypoint in navbar**: Authenticated users can open chats directly from top navigation.
+- **Enhanced browse and interaction UX**: Search/filter and chat-related refinements for smoother user journey.
 
 ---
 
@@ -72,6 +86,11 @@ cd ReWear
    CLOUDINARY_API_KEY=your_api_key
    CLOUDINARY_API_SECRET=your_api_secret
    # OAuth Credentials...
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USER=your_email
+   SMTP_PASS=your_app_password
+   MAIL_FROM="ReWear <your_email>"
    ```
 4. Start the development server:
    ```bash
