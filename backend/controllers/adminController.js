@@ -117,3 +117,49 @@ exports.getSustainabilityStats = async (req, res, next) => {
     next(error);
   }
 };
+
+// ─── Get User Activity ───────────────────────────────────────────────────────
+exports.getUserActivity = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+    
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Get user's swaps and items
+    const swaps = await Swap.find({
+      $or: [
+        { requester: user._id },
+        { owner: user._id }
+      ]
+    })
+      .populate('item', 'title images')
+      .populate('requester', 'name avatar')
+      .populate('owner', 'name avatar')
+      .sort({ createdAt: -1 })
+      .limit(10);
+
+    const items = await Item.find({ owner: user._id })
+      .sort({ createdAt: -1 })
+      .limit(10);
+
+    const activity = {
+      user,
+      recentSwaps: swaps,
+      recentItems: items,
+      stats: {
+        itemsListed: user.itemsListed || 0,
+        totalSwaps: user.totalSwaps || 0,
+        totalItemsReused: user.totalItemsReused || 0,
+        totalWaterSaved: user.totalWaterSaved || 0,
+        totalCarbonSaved: user.totalCarbonSaved || 0,
+      }
+    };
+
+    res.json({ success: true, activity });
+  } catch (error) {
+    next(error);
+  }
+};

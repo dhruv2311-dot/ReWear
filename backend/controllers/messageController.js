@@ -58,7 +58,6 @@ exports.sendMessage = async (req, res, next) => {
     const io = req.app.get('io');
     if (io) {
       io.to(swap.chatRoomId).emit('message:new', message);
-      io.to(swap.chatRoomId).emit('newMessage', message);
     }
 
     const recipient = swap.requester.toString() === req.user._id.toString() ? swap.owner : swap.requester;

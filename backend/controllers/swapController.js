@@ -148,6 +148,24 @@ exports.getMySwaps = async (req, res, next) => {
   }
 };
 
+// ─── Get My Purchases ─────────────────────────────────────────────────────
+exports.getMyPurchases = async (req, res, next) => {
+  try {
+    const purchases = await Swap.find({
+      requester: req.user._id,
+      status: 'completed'
+    })
+      .populate('item', 'title images pointsValue')
+      .populate('owner', 'name avatar')
+      .populate('offeredItem', 'title images')
+      .sort({ completedAt: -1 });
+
+    res.json({ success: true, purchases });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // ─── Get Single Swap ──────────────────────────────────────────────────────────
 exports.getSwap = async (req, res, next) => {
   try {

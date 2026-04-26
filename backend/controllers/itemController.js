@@ -9,7 +9,7 @@ exports.createItem = async (req, res, next) => {
   try {
     const {
       title, description, category, type, size,
-      condition, pointsValue, tags, city, state, country,
+      condition, pointsValue, tags, city, state, country, lat, lng
     } = req.body;
 
     // Upload images to Cloudinary
@@ -32,7 +32,10 @@ exports.createItem = async (req, res, next) => {
       pointsValue: pointsValue || 50,
       tags: tags ? (Array.isArray(tags) ? tags : tags.split(',').map(t => t.trim())) : [],
       owner: req.user._id,
-      location: { city, state, country },
+      location: { 
+        city, state, country,
+        coordinates: lat && lng ? { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] } : undefined
+      },
       status: 'pending', // Requires admin approval
     });
 
@@ -163,7 +166,51 @@ exports.updateItem = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
-    const updated = await Item.findByIdAndUpdate(req.params.id, req.body, {
+    let updatedImages = [...item.images];
+
+    // Handle removed images
+    if (req.body.removedImages) {
+      try {
+        const removedImagesList = JSON.parse(req.body.removedImages);
+        for (const publicId of removedImagesList) {
+          await deleteFromCloudinary(publicId);
+          updatedImages = updatedImages.filter(img => img.publicId !== publicId);
+        }
+      } catch (err) {
+        console.error('Error processing removedImages:', err);
+      }
+    }
+
+    // Upload new images
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const result = await uploadToCloudinary(file.buffer, 'rewear/items');
+        updatedImages.push({ url: result.secure_url, publicId: result.public_id });
+      }
+    }
+
+    const {
+      title, description, category, type, size,
+      condition, pointsValue, tags, city, state, country, lat, lng
+    } = req.body;
+
+    const updatedData = {
+      title,
+      description,
+      category,
+      type,
+      size,
+      condition,
+      pointsValue: pointsValue || 50,
+      tags: tags ? (Array.isArray(tags) ? tags : tags.split(',').map(t => t.trim())) : [],
+      location: { 
+        city, state, country,
+        coordinates: lat && lng ? { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] } : undefined
+      },
+      images: updatedImages,
+    };
+
+    const updated = await Item.findByIdAndUpdate(req.params.id, updatedData, {
       new: true,
       runValidators: true,
     });

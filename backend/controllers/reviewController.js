@@ -64,7 +64,8 @@ exports.deleteReview = async (req, res, next) => {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
-    await review.deleteOne();
+    // Use findOneAndDelete to trigger the post('remove') hook for rating recalculation
+    await Review.findOneAndDelete({ _id: req.params.id });
     res.json({ success: true, message: 'Review deleted' });
   } catch (error) {
     next(error);

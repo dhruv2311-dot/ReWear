@@ -109,13 +109,16 @@ exports.logout = (req, res) => {
 // ─── Update Profile ──────────────────────────────────────────────────────────
 exports.updateProfile = async (req, res, next) => {
   try {
-    const { name, bio, city, state, country } = req.body;
+    const { name, bio, city, state, country, lat, lng } = req.body;
     const updates = {};
 
     if (name) updates.name = name;
     if (bio !== undefined) updates.bio = bio;
-    if (city || state || country) {
+    if (city || state || country || (lat && lng)) {
       updates.location = { city, state, country };
+      if (lat && lng) {
+        updates.location.coordinates = { type: 'Point', coordinates: [parseFloat(lng), parseFloat(lat)] };
+      }
     }
 
     // Handle avatar upload
