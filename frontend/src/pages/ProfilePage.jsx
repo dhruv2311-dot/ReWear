@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Award, BadgeCheck, Edit3, Leaf, MapPin, Package, RefreshCw, ShoppingBag, Star, User } from 'lucide-react';
+import SkeletonLoader from '../components/SkeletonLoader';
 import { useAuth } from '../context/AuthContext';
 import { itemService, swapService } from '../services/api';
 
@@ -10,6 +11,7 @@ const ProfilePage = () => {
   const [items, setItems] = useState([]);
   const [swaps, setSwaps] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -23,6 +25,11 @@ const ProfilePage = () => {
         if (!active) return;
         if (itemsRes.status === 'fulfilled') setItems(itemsRes.value.data.items || []);
         if (swapsRes.status === 'fulfilled') setSwaps(swapsRes.value.data.swaps || []);
+        if (itemsRes.status === 'rejected' || swapsRes.status === 'rejected') {
+          setError('Some data could not be loaded.');
+        } else {
+          setError(null);
+        }
       } finally {
         if (active) setLoading(false);
       }
@@ -116,7 +123,9 @@ const ProfilePage = () => {
           <div className="card" style={{ padding: '1.4rem' }}>
             <h2 style={{ fontFamily: 'Poppins', fontWeight: 800, marginBottom: '1rem' }}>Recent Items</h2>
             {loading ? (
-              <div className="skeleton" style={{ height: '220px' }} />
+              <SkeletonLoader type="card" count={1} />
+            ) : error ? (
+              <p style={{ color: '#dc2626' }}>Failed to load items.</p>
             ) : items.length > 0 ? (
               <div style={{ display: 'grid', gap: '0.8rem' }}>
                 {items.slice(0, 3).map((item) => (
@@ -137,7 +146,9 @@ const ProfilePage = () => {
           <div className="card" style={{ padding: '1.4rem' }}>
             <h2 style={{ fontFamily: 'Poppins', fontWeight: 800, marginBottom: '1rem' }}>Recent Swaps</h2>
             {loading ? (
-              <div className="skeleton" style={{ height: '220px' }} />
+              <SkeletonLoader type="card" count={1} />
+            ) : error ? (
+              <p style={{ color: '#dc2626' }}>Failed to load swaps.</p>
             ) : swaps.length > 0 ? (
               <div style={{ display: 'grid', gap: '0.8rem' }}>
                 {swaps.slice(0, 3).map((swap) => (

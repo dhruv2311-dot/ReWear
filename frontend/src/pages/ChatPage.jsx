@@ -11,13 +11,12 @@ const ChatPage = () => {
   const { swapId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { socket, joinRoom, leaveRoom } = useSocket();
+  const { socket, joinRoom, leaveRoom, startTyping, stopTyping } = useSocket();
   const [messages, setMessages] = useState([]);
   const [swap, setSwap] = useState(null);
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [isTyping, setIsTyping] = useState(false);
   const [otherTyping, setOtherTyping] = useState(false);
   const bottomRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -67,17 +66,28 @@ const ChatPage = () => {
     };
 
     socket.on('message:new', onMsg);
-    socket.on('newMessage', onMsg);
     socket.on('userTyping', onTyping);
     socket.on('userStopTyping', onStopTyping);
 
+    // Listen for swap status updates
+    const onSwapStatusUpdate = ({ swapId: updatedSwapId, status }) => {
+      if (updatedSwapId === swapId) {
+        setSwap(prev => prev ? { ...prev, status } : null);
+      }
+    };
+    socket.on('swap:statusUpdate', onSwapStatusUpdate);
+
     return () => {
       socket.off('message:new', onMsg);
-      socket.off('newMessage', onMsg);
       socket.off('userTyping', onTyping);
       socket.off('userStopTyping', onStopTyping);
+      socket.off('swap:statusUpdate', onSwapStatusUpdate);
     };
   }, [socket, swapId, user?._id]);
+
+  useEffect(() => {
+    return () => clearTimeout(typingTimeoutRef.current);
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -86,10 +96,10 @@ const ChatPage = () => {
   const handleTyping = (val) => {
     setText(val);
     if (!socket) return;
-    socket.emit('typing', { swapId, userId: user?._id });
+    startTyping?.(swapId);
     clearTimeout(typingTimeoutRef.current);
     typingTimeoutRef.current = setTimeout(() => {
-      socket.emit('stopTyping', { swapId, userId: user?._id });
+      stopTyping?.(swapId);
     }, 1500);
   };
 

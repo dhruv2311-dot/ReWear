@@ -3,13 +3,20 @@ import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Filter, SlidersHorizontal, X, ChevronDown, MapPin, LoaderCircle } from 'lucide-react';
 import ItemCard from '../components/ItemCard';
+import SkeletonLoader from '../components/SkeletonLoader';
 import { itemService } from '../services/api';
 import { useDebouncedCallback } from 'use-debounce';
+import toast from 'react-hot-toast';
 
 const CATEGORIES = ['All', 'Tops', 'Bottoms', 'Dresses', 'Outerwear', 'Shoes', 'Accessories', 'Activewear', 'Formal', 'Kids'];
 const SIZES = ['All', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'Free Size'];
 const CONDITIONS = ['All', 'Brand New', 'Like New', 'Good', 'Fair', 'Worn'];
 const TYPES = ['All', 'Swap', 'Points', 'Both'];
+const POPULAR_TAGS = [
+  'vintage', 'cotton', 'formal', 'casual', 'summer', 'winter', 'sustainable', 
+  'organic', 'handmade', 'designer', 'minimalist', 'bohemian', 'streetwear',
+  'athletic', 'party', 'work', 'eco-friendly', 'recycled', 'vintage-inspired'
+];
 const SORTS = [
   { value: 'newest', label: 'Newest First' },
   { value: 'popular', label: 'Most Popular' },
@@ -25,6 +32,7 @@ const BrowsePage = () => {
   const [pagination, setPagination] = useState({ total: 0, page: 1, pages: 1 });
   const [showFilters, setShowFilters] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState(null);
   const loadMoreRef = useRef(null);
   const [filters, setFilters] = useState({
     search: searchParams.get('search') || '',
@@ -32,6 +40,10 @@ const BrowsePage = () => {
     size: 'All',
     condition: 'All',
     type: 'All',
+    tags: '',
+    lat: '',
+    lng: '',
+    radius: '',
     sort: 'newest',
     city: '',
     minPoints: '',
@@ -53,9 +65,15 @@ const BrowsePage = () => {
     if (params.condition !== 'All') query.condition = params.condition;
     if (params.type !== 'All') query.type = params.type;
     if (params.search) query.search = params.search;
+    if (params.tags) query.tags = params.tags;
     if (params.city) query.city = params.city;
     if (params.minPoints) query.minPoints = params.minPoints;
     if (params.maxPoints) query.maxPoints = params.maxPoints;
+    if (params.lat && params.lng) {
+      query.lat = params.lat;
+      query.lng = params.lng;
+      if (params.radius) query.radius = params.radius;
+    }
     query.sort = params.sort;
     query.page = params.page;
     query.limit = 12;
@@ -64,8 +82,10 @@ const BrowsePage = () => {
       const { data } = await itemService.getItems(query);
       setItems(prev => append ? [...prev, ...(data.items || [])] : (data.items || []));
       setPagination(data.pagination || {});
+      setError(null);
     } catch (e) {
       console.error(e);
+      setError(e.response?.data?.message || 'Failed to load items. Please try again.');
     } finally {
       if (append) {
         setLoadingMore(false);
@@ -95,14 +115,46 @@ const BrowsePage = () => {
   };
 
   const clearFilters = () => {
-    const reset = { search: '', category: 'All', size: 'All', condition: 'All', type: 'All', sort: 'newest', city: '', minPoints: '', maxPoints: '', page: 1 };
+    const reset = { search: '', category: 'All', size: 'All', condition: 'All', type: 'All', tags: '', lat: '', lng: '', radius: '', sort: 'newest', city: '', minPoints: '', maxPoints: '', page: 1 };
     setFilters(reset);
     fetchItems(reset);
   };
 
+  const setNearbyFilter = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported in this browser');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const updated = {
+          ...filters,
+          lat: position.coords.latitude.toFixed(6),
+          lng: position.coords.longitude.toFixed(6),
+          radius: filters.radius || '25',
+          page: 1,
+        };
+        setFilters(updated);
+        fetchItems(updated);
+      },
+      () => {
+        toast.error('Unable to read your location. Please allow location access.');
+      },
+      { timeout: 10000 }
+    );
+  };
+
+  const clearNearbyFilter = () => {
+    const updated = { ...filters, lat: '', lng: '', radius: '', page: 1 };
+    setFilters(updated);
+    fetchItems(updated);
+  };
+
   const activeFilterCount = [
     filters.category !== 'All', filters.size !== 'All', filters.condition !== 'All',
-    filters.type !== 'All', filters.city, filters.minPoints, filters.maxPoints,
+    filters.type !== 'All', filters.tags, filters.city, filters.minPoints, filters.maxPoints,
+    filters.lat && filters.lng,
   ].filter(Boolean).length;
 
   const handleLoadMore = useCallback(() => {
@@ -258,6 +310,108 @@ const BrowsePage = () => {
                   </div>
                 </div>
 
+                {/* Tags */}
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label style={{ fontWeight: 700, fontSize: '0.8rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '0.6rem' }}>Tags</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    placeholder="vintage, cotton, formal"
+                    style={{ padding: '0.6rem 0.75rem', fontSize: '0.875rem', marginBottom: '0.75rem' }}
+                    value={filters.tags}
+                    onChange={e => updateFilter('tags', e.target.value)}
+                  />
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                    {POPULAR_TAGS.map(tag => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => {
+                          const currentTags = filters.tags ? filters.tags.split(',').map(t => t.trim()).filter(t => t) : [];
+                          const newTags = currentTags.includes(tag) 
+                            ? currentTags.filter(t => t !== tag)
+                            : [...currentTags, tag];
+                          updateFilter('tags', newTags.join(', '));
+                        }}
+                        style={{
+                          padding: '0.25rem 0.6rem',
+                          borderRadius: '20px',
+                          border: `1px solid ${filters.tags && filters.tags.includes(tag) ? '#1B5E20' : '#E5E7EB'}`,
+                          background: filters.tags && filters.tags.includes(tag) ? '#1B5E20' : 'white',
+                          color: filters.tags && filters.tags.includes(tag) ? 'white' : '#6B7280',
+                          cursor: 'pointer',
+                          fontSize: '0.75rem',
+                          fontWeight: '500',
+                          transition: 'all 0.15s',
+                          textTransform: 'lowercase'
+                        }}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Nearby distance */}
+                <div>
+                  <label style={{ fontWeight: 700, fontSize: '0.8rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '0.6rem' }}>Distance</label>
+                  <div style={{ display: 'grid', gap: '0.45rem' }}>
+                    <input
+                      type="number"
+                      className="input-field"
+                      placeholder="Radius in km"
+                      min={1}
+                      max={200}
+                      style={{ padding: '0.6rem 0.75rem', fontSize: '0.875rem' }}
+                      value={filters.radius}
+                      onChange={e => updateFilter('radius', e.target.value)}
+                    />
+                    <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={{ padding: '0.4rem 0.7rem', fontSize: '0.78rem' }}
+                        onClick={setNearbyFilter}
+                      >
+                        <MapPin size={13} /> Use my location
+                      </button>
+                      {(filters.lat && filters.lng) && (
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          style={{ padding: '0.4rem 0.7rem', fontSize: '0.78rem' }}
+                          onClick={clearNearbyFilter}
+                        >
+                          <X size={13} /> Clear location
+                        </button>
+                      )}
+                    </div>
+                    {/* Quick distance buttons */}
+                    <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                      {[5, 10, 25, 50].map(distance => (
+                        <button
+                          key={distance}
+                          type="button"
+                          onClick={() => updateFilter('radius', distance.toString())}
+                          style={{
+                            padding: '0.3rem 0.6rem',
+                            borderRadius: '6px',
+                            border: `1px solid ${filters.radius === distance.toString() ? '#1B5E20' : '#E5E7EB'}`,
+                            background: filters.radius === distance.toString() ? '#1B5E20' : 'white',
+                            color: filters.radius === distance.toString() ? 'white' : '#6B7280',
+                            cursor: 'pointer',
+                            fontSize: '0.75rem',
+                            fontWeight: '500',
+                            transition: 'all 0.15s'
+                          }}
+                        >
+                          {distance}km
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
                 {/* Points range */}
                 <div>
                   <label style={{ fontWeight: 700, fontSize: '0.8rem', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '0.6rem' }}>Points Range</label>
@@ -277,15 +431,14 @@ const BrowsePage = () => {
         {/* Items Grid */}
         {loading ? (
           <div className="items-grid">
-            {[...Array(12)].map((_, i) => (
-              <div key={i} className="item-card">
-                <div className="skeleton" style={{ aspectRatio: '4/5', width: '100%' }} />
-                <div style={{ padding: '1rem' }}>
-                  <div className="skeleton" style={{ height: '18px', marginBottom: '0.5rem' }} />
-                  <div className="skeleton" style={{ height: '14px', width: '60%' }} />
-                </div>
-              </div>
-            ))}
+            <SkeletonLoader type="item" count={12} />
+          </div>
+        ) : error ? (
+          <div style={{ textAlign: 'center', padding: '5rem 2rem' }}>
+            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>⚠️</div>
+            <h3 style={{ fontFamily: 'Poppins', fontWeight: 700, fontSize: '1.4rem', color: '#1a1a2e', marginBottom: '0.5rem' }}>Oops! Something went wrong</h3>
+            <p style={{ color: '#6B7280', marginBottom: '1.5rem' }}>{error}</p>
+            <button onClick={() => fetchItems()} className="btn-primary">Try Again</button>
           </div>
         ) : items.length > 0 ? (
           <>

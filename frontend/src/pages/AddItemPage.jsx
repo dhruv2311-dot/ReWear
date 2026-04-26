@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Upload, X, Plus, MapPin, Tag, Package, CheckCircle, AlertCircle, Image } from 'lucide-react';
+import UploadProgress from '../components/UploadProgress';
 import { itemService } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -26,12 +27,14 @@ const AddItemPage = () => {
   const [form, setForm] = useState({
     title: '', description: '', category: 'Tops', type: 'Both',
     size: 'M', condition: 'Good', pointsValue: 50,
-    tags: '', city: '', state: '', country: '',
+    tags: '', city: '', state: '', country: '', lat: '', lng: ''
   });
   const [images, setImages] = useState([]);
   const [previews, setPreviews] = useState([]);
   const [loading, setLoading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({});
+  const [uploadErrors, setUploadErrors] = useState({});
 
   const handleImageChange = (files) => {
     const arr = Array.from(files).slice(0, 5 - images.length);
@@ -52,16 +55,33 @@ const AddItemPage = () => {
     if (images.length === 0) { toast.error('Please upload at least one image'); return; }
 
     setLoading(true);
+    setUploadProgress({});
+    setUploadErrors({});
+    
     try {
       const formData = new FormData();
       Object.entries(form).forEach(([k, v]) => formData.append(k, v));
       images.forEach(img => formData.append('images', img));
 
-      await itemService.createItem(formData);
+      const onUploadProgress = (progressEvent) => {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        const newProgress = {};
+        images.forEach((img, idx) => {
+          newProgress[`${img.name}_${idx}`] = percentCompleted;
+        });
+        setUploadProgress(newProgress);
+      };
+
+      await itemService.createItem(formData, onUploadProgress);
       toast.success('Item submitted for review! 🎉 Admin will approve it shortly.');
       navigate('/dashboard');
     } catch (e) {
       toast.error(e.response?.data?.message || 'Failed to create item');
+      // Set errors for failed uploads
+      images.forEach((image, index) => {
+        const key = `${image.name}_${index}`;
+        setUploadErrors(prev => ({ ...prev, [key]: 'Upload failed' }));
+      });
     } finally {
       setLoading(false);
     }
@@ -144,6 +164,23 @@ const AddItemPage = () => {
                   )}
                 </div>
               )}
+
+              {/* Upload Progress */}
+              {loading && images.length > 0 && (
+                <div style={{ marginTop: '1rem' }}>
+                  <h3 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#374151', marginBottom: '0.75rem' }}>
+                    Upload Progress
+                  </h3>
+                  <UploadProgress
+                    files={images}
+                    progress={uploadProgress}
+                    errors={uploadErrors}
+                    onRemove={removeImage}
+                    showProgress={true}
+                    compact={true}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Basic Info */}
@@ -220,6 +257,43 @@ const AddItemPage = () => {
                     <input type="text" className="input-field" placeholder="India"
                       value={form.country} onChange={e => setForm({ ...form, country: e.target.value })} />
                   </F>
+                </div>
+                <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+                  <button type="button" className="btn-secondary" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.875rem' }}
+                    onClick={() => {
+                      if (navigator.geolocation) {
+                        toast.loading('Acquiring location...', { id: 'geoToast' });
+                        navigator.geolocation.getCurrentPosition(
+                          async pos => {
+                            const lat = pos.coords.latitude;
+                            const lng = pos.coords.longitude;
+                            setForm(prev => ({ ...prev, lat, lng }));
+                            toast.success('Coordinates acquired!', { id: 'geoToast' });
+                            
+                            // Reverse geocoding using Nominatim
+                            try {
+                              const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+                              const data = await res.json();
+                              if (data.address) {
+                                setForm(prev => ({
+                                  ...prev,
+                                  city: data.address.city || data.address.town || data.address.village || prev.city,
+                                  state: data.address.state || prev.state,
+                                  country: data.address.country || prev.country
+                                }));
+                                toast.success('Address auto-filled!');
+                              }
+                            } catch (e) {
+                              console.error('Reverse geocoding failed', e);
+                            }
+                          },
+                          () => toast.error('Could not get location', { id: 'geoToast' })
+                        );
+                      }
+                    }}>
+                    <MapPin size={16} /> Get Current Coordinates
+                  </button>
+                  {form.lat && form.lng && <span style={{ fontSize: '0.8rem', color: '#1B5E20', fontWeight: 600 }}>Coordinates saved!</span>}
                 </div>
               </div>
             </div>

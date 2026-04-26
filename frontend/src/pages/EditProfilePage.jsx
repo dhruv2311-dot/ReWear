@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Camera, LoaderCircle, MapPin, Save, User } from 'lucide-react';
+import UploadProgress from '../components/UploadProgress';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/api';
@@ -9,10 +10,12 @@ import { authService } from '../services/api';
 const EditProfilePage = () => {
   const { user, updateUser } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({ name: '', bio: '', city: '', state: '', country: '' });
+  const [form, setForm] = useState({ name: '', bio: '', city: '', state: '', country: '', lat: '', lng: '' });
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState('');
   const [saving, setSaving] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({});
+  const [uploadErrors, setUploadErrors] = useState({});
 
   useEffect(() => {
     if (!user) return;
@@ -22,6 +25,8 @@ const EditProfilePage = () => {
       city: user.location?.city || '',
       state: user.location?.state || '',
       country: user.location?.country || '',
+      lat: user.location?.coordinates?.coordinates?.[1] || '',
+      lng: user.location?.coordinates?.coordinates?.[0] || '',
     });
     setAvatarPreview(user.avatar || '');
   }, [user]);
@@ -35,16 +40,31 @@ const EditProfilePage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
+    setUploadProgress({});
+    setUploadErrors({});
+    
     try {
       const formData = new FormData();
       Object.entries(form).forEach(([key, value]) => formData.append(key, value));
       if (avatarFile) formData.append('avatar', avatarFile);
-      const { data } = await authService.updateProfile(formData);
+
+      const onUploadProgress = (progressEvent) => {
+        if (avatarFile) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress({ [`${avatarFile.name}_0`]: percentCompleted });
+        }
+      };
+
+      const { data } = await authService.updateProfile(formData, onUploadProgress);
       updateUser(data.user);
       toast.success('Profile updated successfully');
       navigate('/profile');
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to update profile');
+      if (avatarFile) {
+        const key = `${avatarFile.name}_0`;
+        setUploadErrors(prev => ({ ...prev, [key]: 'Upload failed' }));
+      }
     } finally {
       setSaving(false);
     }
@@ -65,6 +85,20 @@ const EditProfilePage = () => {
                 <input type="file" accept="image/*" hidden onChange={(e) => handleAvatarChange(e.target.files?.[0])} />
               </label>
             </div>
+
+            {/* Upload Progress */}
+            {saving && avatarFile && (
+              <div style={{ marginTop: '0.5rem' }}>
+                <UploadProgress
+                  files={[avatarFile]}
+                  progress={uploadProgress}
+                  errors={uploadErrors}
+                  onRemove={() => setAvatarFile(null)}
+                  showProgress={true}
+                  compact={true}
+                />
+              </div>
+            )}
 
             <div>
               <label className="form-label">Name</label>
@@ -95,6 +129,43 @@ const EditProfilePage = () => {
                 <label className="form-label">Country</label>
                 <input className="input-field" value={form.country} onChange={(e) => setForm(prev => ({ ...prev, country: e.target.value }))} />
               </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+              <button type="button" className="btn-secondary" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.875rem' }}
+                onClick={() => {
+                  if (navigator.geolocation) {
+                    toast.loading('Acquiring location...', { id: 'geoToastProf' });
+                    navigator.geolocation.getCurrentPosition(
+                      async pos => {
+                        const lat = pos.coords.latitude;
+                        const lng = pos.coords.longitude;
+                        setForm(prev => ({ ...prev, lat, lng }));
+                        toast.success('Coordinates acquired!', { id: 'geoToastProf' });
+                        
+                        try {
+                          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+                          const data = await res.json();
+                          if (data.address) {
+                            setForm(prev => ({
+                              ...prev,
+                              city: data.address.city || data.address.town || data.address.village || prev.city,
+                              state: data.address.state || prev.state,
+                              country: data.address.country || prev.country
+                            }));
+                            toast.success('Address auto-filled!');
+                          }
+                        } catch (e) {
+                          console.error('Reverse geocoding failed', e);
+                        }
+                      },
+                      () => toast.error('Could not get location', { id: 'geoToastProf' })
+                    );
+                  }
+                }}>
+                <MapPin size={16} /> Get Current Coordinates
+              </button>
+              {form.lat && form.lng && <span style={{ fontSize: '0.8rem', color: '#1B5E20', fontWeight: 600 }}>Coordinates saved!</span>}
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', flexWrap: 'wrap' }}>

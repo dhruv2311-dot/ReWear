@@ -1,13 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link } from 'react-router-dom';
-import {
-  Leaf, Star, Package, RefreshCw, ShoppingBag, Award, Droplets, Wind,
-  Settings, Camera, Plus, ChevronRight, CheckCircle, Clock, XCircle, MessageSquare
-} from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
-import { itemService, swapService } from '../services/api';
+import { Users, Package, RefreshCw, ShieldCheck, TrendingUp, Award, Plus, CheckCircle, XCircle, MessageSquare, ArrowLeft, Search, LoaderCircle, Leaf, Droplets, Wind, Settings, ShoppingBag } from 'lucide-react';
 import ItemCard from '../components/ItemCard';
+import ConfirmationModal from '../components/ConfirmationModal';
+import SkeletonLoader from '../components/SkeletonLoader';
+import { itemService, swapService } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
+import { useDebouncedCallback } from 'use-debounce';
 import toast from 'react-hot-toast';
 
 const badgeIcons = {
@@ -30,40 +31,93 @@ const statusBadge = (status) => {
   return <span style={{ padding: '0.25rem 0.75rem', borderRadius: '100px', fontSize: '0.75rem', fontWeight: 700, color: s.color, background: s.bg }}>{s.label}</span>;
 };
 
-const TABS = ['Profile', 'My Listings', 'My Swaps', 'Impact'];
+const TABS = ['Profile', 'My Listings', 'My Swaps', 'My Purchases', 'Impact'];
 
 const DashboardPage = () => {
   const { user, updateUser } = useAuth();
+  const { socket } = useSocket();
   const [activeTab, setActiveTab] = useState('Profile');
   const [listings, setListings] = useState([]);
   const [swaps, setSwaps] = useState([]);
+  const [purchases, setPurchases] = useState([]);
   const [loadingItems, setLoadingItems] = useState(false);
   const [loadingSwaps, setLoadingSwaps] = useState(false);
+  const [loadingPurchases, setLoadingPurchases] = useState(false);
+  const [errorListings, setErrorListings] = useState(null);
+  const [errorSwaps, setErrorSwaps] = useState(null);
+  const [errorPurchases, setErrorPurchases] = useState(null);
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, itemId: null, itemName: '' });
+  const [swapModal, setSwapModal] = useState({ isOpen: false, swapId: null, action: null, itemName: '' });
 
   useEffect(() => {
-    if (activeTab === 'My Listings' && listings.length === 0) {
+    if (activeTab === 'My Listings' && listings.length === 0 && !errorListings) {
       setLoadingItems(true);
       itemService.getMyItems()
-        .then(r => setListings(r.data.items || []))
-        .catch(console.error)
+        .then(r => { setListings(r.data.items || []); setErrorListings(null); })
+        .catch(e => setErrorListings(e.response?.data?.message || 'Failed to load listings'))
         .finally(() => setLoadingItems(false));
     }
-    if (activeTab === 'My Swaps' && swaps.length === 0) {
+    if (activeTab === 'My Swaps' && swaps.length === 0 && !errorSwaps) {
       setLoadingSwaps(true);
       swapService.getMySwaps()
-        .then(r => setSwaps(r.data.swaps || []))
-        .catch(console.error)
+        .then(r => { setSwaps(r.data.swaps || []); setErrorSwaps(null); })
+        .catch(e => setErrorSwaps(e.response?.data?.message || 'Failed to load swaps'))
         .finally(() => setLoadingSwaps(false));
+    }
+    if (activeTab === 'My Purchases' && purchases.length === 0 && !errorPurchases) {
+      setLoadingPurchases(true);
+      swapService.getMyPurchases()
+        .then(r => { setPurchases(r.data.purchases || []); setErrorPurchases(null); })
+        .catch(e => setErrorPurchases(e.response?.data?.message || 'Failed to load purchases'))
+        .finally(() => setLoadingPurchases(false));
     }
   }, [activeTab]);
 
-  const onSwapAction = async (swapId, status) => {
+  // Listen for real-time swap status updates
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleSwapStatusUpdate = ({ swapId, status }) => {
+      setSwaps(prev => prev.map(swap => 
+        swap._id === swapId ? { ...swap, status } : swap
+      ));
+    };
+
+    socket.on('swap:statusUpdate', handleSwapStatusUpdate);
+
+    return () => {
+      socket.off('swap:statusUpdate', handleSwapStatusUpdate);
+    };
+  }, [socket]);
+
+  const onSwapAction = (swapId, status, itemName) => {
+    setSwapModal({
+      isOpen: true,
+      swapId,
+      action: status,
+      itemName: itemName || 'this swap'
+    });
+  };
+
+  const handleSwapConfirm = async () => {
     try {
-      await swapService.updateStatus(swapId, status);
-      setSwaps(prev => prev.map(s => s._id === swapId ? { ...s, status } : s));
-      toast.success(`Swap ${status}!`);
+      await swapService.updateStatus(swapModal.swapId, swapModal.action);
+      setSwaps(prev => prev.map(s => s._id === swapModal.swapId ? { ...s, status: swapModal.action } : s));
+      toast.success(`Swap ${swapModal.action}!`);
+      setSwapModal({ isOpen: false, swapId: null, action: null, itemName: '' });
     } catch (e) {
       toast.error(e.response?.data?.message || 'Action failed');
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    try {
+      await itemService.deleteItem(deleteModal.itemId);
+      setListings(prev => prev.filter(l => l._id !== deleteModal.itemId));
+      toast.success('Item deleted successfully');
+      setDeleteModal({ isOpen: false, itemId: null, itemName: '' });
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete item');
     }
   };
 
@@ -219,20 +273,75 @@ const DashboardPage = () => {
                 </div>
                 {loadingItems ? (
                   <div className="items-grid">
-                    {[...Array(4)].map((_, i) => (
-                      <div key={i} className="item-card">
-                        <div className="skeleton" style={{ aspectRatio: '4/5' }} />
-                        <div style={{ padding: '1rem' }}><div className="skeleton" style={{ height: '18px' }} /></div>
-                      </div>
-                    ))}
+                    <SkeletonLoader type="item" count={4} />
+                  </div>
+                ) : errorListings ? (
+                  <div style={{ textAlign: 'center', padding: '4rem 2rem', color: '#dc2626' }}>
+                    <p style={{ fontWeight: 700 }}>{errorListings}</p>
                   </div>
                 ) : listings.length > 0 ? (
                   <div className="items-grid">
                     {listings.map((item, i) => (
                       <div key={item._id} style={{ position: 'relative' }}>
                         <ItemCard item={item} index={i} />
-                        <div style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 5 }}>
+                        <div style={{ position: 'absolute', top: '12px', right: '12px', zIndex: 5, display: 'flex', gap: '0.5rem' }}>
                           {statusBadge(item.status)}
+                          <div style={{ display: 'flex', gap: '0.35rem' }}>
+                            <button
+                              onClick={() => navigate(`/edit-item/${item._id}`)}
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(27,94,32,0.2)',
+                                background: 'rgba(255,255,255,0.95)',
+                                color: '#1B5E20',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s'
+                              }}
+                              onMouseEnter={e => {
+                                e.target.style.background = '#1B5E20';
+                                e.target.style.color = 'white';
+                              }}
+                              onMouseLeave={e => {
+                                e.target.style.background = 'rgba(255,255,255,0.95)';
+                                e.target.style.color = '#1B5E20';
+                              }}
+                              title="Edit item"
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              onClick={() => setDeleteModal({ isOpen: true, itemId: item._id, itemName: item.title })}
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '8px',
+                                border: '1px solid rgba(239,68,68,0.2)',
+                                background: 'rgba(255,255,255,0.95)',
+                                color: '#dc2626',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                transition: 'all 0.15s'
+                              }}
+                              onMouseEnter={e => {
+                                e.target.style.background = '#dc2626';
+                                e.target.style.color = 'white';
+                              }}
+                              onMouseLeave={e => {
+                                e.target.style.background = 'rgba(255,255,255,0.95)';
+                                e.target.style.color = '#dc2626';
+                              }}
+                              title="Delete item"
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -252,7 +361,13 @@ const DashboardPage = () => {
             {activeTab === 'My Swaps' && (
               <div>
                 {loadingSwaps ? (
-                  <div style={{ display: 'flex', justifyContent: 'center', padding: '3rem' }}><div className="spinner" /></div>
+                  <div>
+                    <SkeletonLoader type="card" count={3} />
+                  </div>
+                ) : errorSwaps ? (
+                  <div style={{ textAlign: 'center', padding: '4rem 2rem', color: '#dc2626' }}>
+                    <p style={{ fontWeight: 700 }}>{errorSwaps}</p>
+                  </div>
                 ) : (() => {
                   const incoming = swaps.filter(swap => swap.owner?._id === user?._id);
                   const outgoing = swaps.filter(swap => swap.requester?._id === user?._id);
@@ -287,16 +402,16 @@ const DashboardPage = () => {
                                   <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0, flexWrap: 'wrap' }}>
                                     {!iAmRequester && swap.status === 'pending' && (
                                       <>
-                                        <button onClick={() => onSwapAction(swap._id, 'accepted')} style={{ padding: '0.5rem 1rem', background: '#1B5E20', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                        <button onClick={() => onSwapAction(swap._id, 'accepted', swap.item?.title)} style={{ padding: '0.5rem 1rem', background: '#1B5E20', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                                           <CheckCircle size={14} /> Accept
                                         </button>
-                                        <button onClick={() => onSwapAction(swap._id, 'rejected')} style={{ padding: '0.5rem 1rem', background: 'rgba(239,68,68,0.1)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                        <button onClick={() => onSwapAction(swap._id, 'rejected', swap.item?.title)} style={{ padding: '0.5rem 1rem', background: 'rgba(239,68,68,0.1)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                                           <XCircle size={14} /> Reject
                                         </button>
                                       </>
                                     )}
                                     {swap.status === 'accepted' && (
-                                      <button onClick={() => onSwapAction(swap._id, 'completed')} style={{ padding: '0.5rem 1rem', background: '#4DB6AC', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 }}>
+                                      <button onClick={() => onSwapAction(swap._id, 'completed', swap.item?.title)} style={{ padding: '0.5rem 1rem', background: '#4DB6AC', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700 }}>
                                         Mark Complete
                                       </button>
                                     )}
@@ -330,7 +445,89 @@ const DashboardPage = () => {
               </div>
             )}
 
-            {/* ─── IMPACT TAB ───────────────────────────────────────────── */}
+            {/* ─── MY PURCHASES TAB ───────────────────────────────────── */}
+            {activeTab === 'My Purchases' && (
+              <div>
+                {loadingPurchases ? (
+                  <div>
+                    <SkeletonLoader type="card" count={3} />
+                  </div>
+                ) : errorPurchases ? (
+                  <div style={{ textAlign: 'center', padding: '4rem 2rem', color: '#dc2626' }}>
+                    <p style={{ fontWeight: 700 }}>{errorPurchases}</p>
+                  </div>
+                ) : purchases.length > 0 ? (
+                  <div style={{ display: 'grid', gap: '1rem' }}>
+                    {purchases.map((purchase, i) => (
+                      <motion.div key={purchase._id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="card" style={{ padding: '1.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                          <img
+                            src={purchase.item?.images?.[0]?.url}
+                            alt=""
+                            style={{ width: '70px', height: '70px', borderRadius: '14px', objectFit: 'cover', flexShrink: 0 }}
+                          />
+                          <div style={{ flex: 1, minWidth: '200px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.5rem' }}>
+                              <p style={{ fontWeight: 700, fontSize: '1rem', color: '#1a1a2e' }}>{purchase.item?.title}</p>
+                              <span style={{ background: '#4DB6AC', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '12px', fontSize: '0.8rem', fontWeight: 700 }}>
+                                ✅ Completed
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                              <p style={{ fontSize: '0.9rem', color: '#6B7280' }}>
+                                From: <strong>{purchase.owner?.name}</strong>
+                              </p>
+                              <p style={{ fontSize: '0.9rem', color: '#4DB6AC', fontWeight: 700 }}>
+                                {purchase.type === 'points' ? ` 🌿 ${purchase.pointsOffered} pts` : ` 🔄 ${purchase.offeredItem?.title || 'Item swap'}`}
+                              </p>
+                            </div>
+                            <p style={{ fontSize: '0.8rem', color: '#9CA3AF', marginTop: '0.5rem' }}>
+                              Completed on {new Date(purchase.completedAt).toLocaleDateString()}
+                            </p>
+                            <Link
+                              to={`/item/${purchase.item?._id}`}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.35rem',
+                                padding: '0.5rem 1rem',
+                                background: 'rgba(27,94,32,0.08)',
+                                color: '#1B5E20',
+                                borderRadius: '8px',
+                                textDecoration: 'none',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                transition: 'all 0.15s'
+                              }}
+                              onMouseEnter={e => {
+                                e.target.style.background = '#1B5E20';
+                                e.target.style.color = 'white';
+                              }}
+                              onMouseLeave={e => {
+                                e.target.style.background = 'rgba(27,94,32,0.08)';
+                                e.target.style.color = '#1B5E20';
+                              }}
+                            >
+                              <Package size={14} />
+                              View Item Details
+                            </Link>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '4rem 2rem' }}>
+                    <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🛍</div>
+                    <h3 style={{ fontWeight: 700, marginBottom: '0.5rem' }}>No purchases yet</h3>
+                    <p style={{ color: '#6B7280', marginBottom: '1.5rem' }}>Completed swaps will appear here.</p>
+                    <Link to="/browse" className="btn-primary">Browse Items</Link>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ─── IMPACT TAB ───────────────────────────────────── */}
             {activeTab === 'Impact' && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.5rem' }}>
                 {impactStats.map(({ icon: Icon, label, value, color, unit }) => (
@@ -360,6 +557,29 @@ const DashboardPage = () => {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {/* Confirmation Modals */}
+      <ConfirmationModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, itemId: null, itemName: '' })}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Item"
+        message={`Are you sure you want to delete "${deleteModal.itemName}"? This action cannot be undone and will permanently remove the item from your listings.`}
+        confirmText="Delete Item"
+        cancelText="Cancel"
+        type="danger"
+      />
+
+      <ConfirmationModal
+        isOpen={swapModal.isOpen}
+        onClose={() => setSwapModal({ isOpen: false, swapId: null, action: null, itemName: '' })}
+        onConfirm={handleSwapConfirm}
+        title={`${swapModal.action?.charAt(0).toUpperCase() + swapModal.action?.slice(1)} Swap`}
+        message={`Are you sure you want to ${swapModal.action} the swap for "${swapModal.itemName}"? ${swapModal.action === 'reject' ? 'This action cannot be undone.' : ''}`}
+        confirmText={`${swapModal.action?.charAt(0).toUpperCase() + swapModal.action?.slice(1)}`}
+        cancelText="Cancel"
+        type={swapModal.action === 'reject' ? 'danger' : swapModal.action === 'accepted' ? 'warning' : 'info'}
+      />
     </div>
   );
 };

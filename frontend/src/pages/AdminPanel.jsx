@@ -5,6 +5,7 @@ import {
   Users, Package, RefreshCw, ShieldCheck, TrendingUp,
   Check, X, Ban, Eye, ChevronDown, Search, Leaf, Droplets, Wind
 } from 'lucide-react';
+import SkeletonLoader from '../components/SkeletonLoader';
 import { adminService, itemService } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -33,26 +34,46 @@ const AdminPanel = () => {
   const [swaps, setSwaps] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [errorStats, setErrorStats] = useState(null);
+  const [errorPending, setErrorPending] = useState(null);
+  const [errorAll, setErrorAll] = useState(null);
+  const [errorUsers, setErrorUsers] = useState(null);
+  const [errorSwaps, setErrorSwaps] = useState(null);
 
   useEffect(() => {
     if (activeTab === 'Overview') {
-      adminService.getStats().then(r => setStats(r.data.stats)).catch(console.error);
+      adminService.getStats()
+        .then(r => { setStats(r.data.stats); setErrorStats(null); })
+        .catch(e => setErrorStats(e.response?.data?.message || 'Failed to load stats'));
     }
     if (activeTab === 'Pending Items') {
       setLoading(true);
-      adminService.getPendingItems().then(r => setPendingItems(r.data.items || [])).finally(() => setLoading(false));
+      adminService.getPendingItems()
+        .then(r => { setPendingItems(r.data.items || []); setErrorPending(null); })
+        .catch(e => setErrorPending(e.response?.data?.message || 'Failed to load pending items'))
+        .finally(() => setLoading(false));
     }
     if (activeTab === 'All Items') {
       setLoading(true);
-      adminService.getItems().then(r => setAllItems(r.data.items || [])).finally(() => setLoading(false));
+      adminService.getItems()
+        .then(r => { setAllItems(r.data.items || []); setErrorAll(null); })
+        .catch(e => setErrorAll(e.response?.data?.message || 'Failed to load items'))
+        .finally(() => setLoading(false));
     }
     if (activeTab === 'Users') {
       setLoading(true);
-      adminService.getUsers({ search }).then(r => setUsers(r.data.users || [])).finally(() => setLoading(false));
+      adminService.getUsers({ search })
+        .then(r => { setUsers(r.data.users || []); setErrorUsers(null); })
+        .catch(e => setErrorUsers(e.response?.data?.message || 'Failed to load users'))
+        .finally(() => setLoading(false));
     }
     if (activeTab === 'Swaps') {
       setLoading(true);
-      adminService.getAllSwaps().then(r => setSwaps(r.data.swaps || [])).finally(() => setLoading(false));
+      adminService.getAllSwaps()
+        .then(r => { setSwaps(r.data.swaps || []); setErrorSwaps(null); })
+        .catch(e => setErrorSwaps(e.response?.data?.message || 'Failed to load swaps'))
+        .finally(() => setLoading(false));
     }
   }, [activeTab]);
 
@@ -77,15 +98,17 @@ const AdminPanel = () => {
     }
   };
 
-  const handleDeleteItem = async (itemId) => {
-    if (!window.confirm('Delete this item permanently?')) return;
+  const confirmDelete = async () => {
+    if (!deleteConfirm) return;
     try {
-      await itemService.deleteItem(itemId);
-      setAllItems(prev => prev.filter(item => item._id !== itemId));
-      setPendingItems(prev => prev.filter(item => item._id !== itemId));
+      await itemService.deleteItem(deleteConfirm);
+      setAllItems(prev => prev.filter(item => item._id !== deleteConfirm));
+      setPendingItems(prev => prev.filter(item => item._id !== deleteConfirm));
       toast.success('Item deleted');
     } catch (error) {
       toast.error(error.response?.data?.message || 'Delete failed');
+    } finally {
+      setDeleteConfirm(null);
     }
   };
 
@@ -132,10 +155,14 @@ const AdminPanel = () => {
           <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
 
             {/* ─── OVERVIEW ──────────────────────────────────────────────── */}
-            {activeTab === 'Overview' && stats && (
+            {activeTab === 'Overview' && (
               <div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
-                  <StatCard icon={Users} label="Total Users" value={stats.totalUsers} color="#7B1FA2" sub={`+12 this week`} />
+                {errorStats ? (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: '#dc2626', fontWeight: 700 }}>{errorStats}</div>
+                ) : stats ? (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem', marginBottom: '2rem' }}>
+                      <StatCard icon={Users} label="Total Users" value={stats.totalUsers} color="#7B1FA2" sub={`+12 this week`} />
                   <StatCard icon={Package} label="Total Items" value={stats.totalItems} color="#1B5E20" sub={`${stats.pendingItems} pending`} />
                   <StatCard icon={RefreshCw} label="Total Swaps" value={stats.totalSwaps} color="#4DB6AC" />
                   <StatCard icon={TrendingUp} label="Pending Reviews" value={stats.pendingItems} color="#F59E0B" sub="Needs attention" />
@@ -159,7 +186,11 @@ const AdminPanel = () => {
                       </div>
                     </div>
                   ))}
-                </div>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '3rem' }}><div className="spinner" style={{ margin: '0 auto' }} /></div>
+                )}
               </div>
             )}
 
@@ -171,6 +202,8 @@ const AdminPanel = () => {
                 </h2>
                 {loading ? (
                   <div style={{ textAlign: 'center', padding: '3rem' }}><div className="spinner" style={{ margin: '0 auto' }} /></div>
+                ) : errorPending ? (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: '#dc2626', fontWeight: 700 }}>{errorPending}</div>
                 ) : pendingItems.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     {pendingItems.map(item => (
@@ -218,7 +251,9 @@ const AdminPanel = () => {
                 <h2 style={{ fontFamily: 'Poppins', fontWeight: 700, fontSize: '1.2rem', marginBottom: '1.5rem' }}>
                   All Items ({allItems.length})
                 </h2>
-                {loading ? <div style={{ textAlign: 'center', padding: '3rem' }}><div className="spinner" style={{ margin: '0 auto' }} /></div> : (
+                {loading ? <SkeletonLoader type="table" count={5} /> : errorAll ? (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: '#dc2626', fontWeight: 700 }}>{errorAll}</div>
+                ) : (
                   <div style={{ background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead>
@@ -253,7 +288,7 @@ const AdminPanel = () => {
                                     <button onClick={() => handleItemStatus(item._id, 'rejected')} style={{ padding: '0.35rem 0.75rem', background: 'rgba(239,68,68,0.1)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}>Reject</button>
                                   </>
                                 )}
-                                <button onClick={() => handleDeleteItem(item._id)} style={{ padding: '0.35rem 0.75rem', background: 'rgba(239,68,68,0.1)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}>Delete</button>
+                                <button onClick={() => setDeleteConfirm(item._id)} style={{ padding: '0.35rem 0.75rem', background: 'rgba(239,68,68,0.1)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700 }}>Delete</button>
                               </div>
                             </td>
                           </tr>
@@ -280,7 +315,9 @@ const AdminPanel = () => {
                       }} />
                   </div>
                 </div>
-                {loading ? <div style={{ textAlign: 'center', padding: '3rem' }}><div className="spinner" style={{ margin: '0 auto' }} /></div> : (
+                {loading ? <SkeletonLoader type="table" count={8} /> : errorUsers ? (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: '#dc2626', fontWeight: 700 }}>{errorUsers}</div>
+                ) : (
                   <div style={{ background: 'white', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead>
@@ -315,12 +352,18 @@ const AdminPanel = () => {
                               </span>
                             </td>
                             <td style={{ padding: '0.85rem 1rem' }}>
-                              {u.role !== 'admin' && (
-                                <button onClick={() => handleToggleBan(u._id)}
-                                  style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.85rem', background: u.isBanned ? '#E8F5E9' : 'rgba(239,68,68,0.1)', color: u.isBanned ? '#1B5E20' : '#dc2626', border: u.isBanned ? '1px solid rgba(27,94,32,0.3)' : '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700 }}>
-                                  <Ban size={13} /> {u.isBanned ? 'Unban' : 'Ban'}
-                                </button>
-                              )}
+                              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                <Link to={`/admin/users/${u._id}/activity`}
+                                  style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.85rem', background: 'rgba(27,94,32,0.08)', color: '#1B5E20', textDecoration: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700, border: '1px solid rgba(27,94,32,0.2)' }}>
+                                  <Eye size={13} /> Activity
+                                </Link>
+                                {u.role !== 'admin' && (
+                                  <button onClick={() => handleToggleBan(u._id)}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.4rem 0.85rem', background: u.isBanned ? '#E8F5E9' : 'rgba(239,68,68,0.1)', color: u.isBanned ? '#1B5E20' : '#dc2626', border: u.isBanned ? '1px solid rgba(27,94,32,0.3)' : '1px solid rgba(239,68,68,0.3)', borderRadius: '8px', cursor: 'pointer', fontSize: '0.78rem', fontWeight: 700 }}>
+                                    <Ban size={13} /> {u.isBanned ? 'Unban' : 'Ban'}
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -337,7 +380,11 @@ const AdminPanel = () => {
                 <h2 style={{ fontFamily: 'Poppins', fontWeight: 700, fontSize: '1.2rem', marginBottom: '1.5rem' }}>
                   All Swaps ({swaps.length})
                 </h2>
-                {loading ? <div style={{ textAlign: 'center', padding: '3rem' }}><div className="spinner" style={{ margin: '0 auto' }} /></div> : swaps.length > 0 ? (
+                {loading ? (
+                  <div style={{ textAlign: 'center', padding: '3rem' }}><div className="spinner" style={{ margin: '0 auto' }} /></div>
+                ) : errorSwaps ? (
+                  <div style={{ textAlign: 'center', padding: '3rem', color: '#dc2626', fontWeight: 700 }}>{errorSwaps}</div>
+                ) : swaps.length > 0 ? (
                   <div style={{ display: 'grid', gap: '1rem' }}>
                     {swaps.map((swap) => (
                       <div key={swap._id} className="card" style={{ padding: '1rem 1.25rem' }}>
@@ -368,6 +415,22 @@ const AdminPanel = () => {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {deleteConfirm && (
+          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setDeleteConfirm(null)}>
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+              onClick={e => e.stopPropagation()} style={{ background: 'white', padding: '2rem', borderRadius: '16px', maxWidth: '400px', width: '90%', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
+              <h3 style={{ fontFamily: 'Poppins', fontWeight: 700, fontSize: '1.25rem', marginBottom: '0.75rem', color: '#1a1a2e' }}>Confirm Deletion</h3>
+              <p style={{ color: '#6B7280', marginBottom: '1.5rem', lineHeight: 1.5 }}>Are you sure you want to delete this item permanently? This action cannot be undone.</p>
+              <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                <button onClick={() => setDeleteConfirm(null)} className="btn-secondary">Cancel</button>
+                <button onClick={confirmDelete} style={{ padding: '0.6rem 1.25rem', background: '#dc2626', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 600 }}>Delete Item</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

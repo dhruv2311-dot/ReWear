@@ -6,7 +6,7 @@ import { useNotifications } from '../context/NotificationContext';
 
 const NotificationsPage = () => {
   const navigate = useNavigate();
-  const { notifications, unreadCount, loading, error, refresh, markRead, markAllRead } = useNotifications();
+  const { notifications, unreadCount, loading, error, refresh, markRead, markAllRead, markUnread } = useNotifications();
 
   useEffect(() => {
     refresh();
@@ -98,6 +98,37 @@ const NotificationsPage = () => {
                         <span style={{ fontSize: '0.75rem', fontWeight: 700, color: notification.read ? '#6B7280' : '#1B5E20', background: notification.read ? '#F3F4F6' : 'rgba(27,94,32,0.1)', padding: '0.28rem 0.6rem', borderRadius: '999px' }}>
                           {notification.read ? 'Read' : 'Unread'}
                         </span>
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            if (notification.read) {
+                              await markUnread(notification._id);
+                            } else {
+                              await markRead(notification._id);
+                            }
+                          }}
+                          style={{
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            color: '#4B5563',
+                            background: 'transparent',
+                            border: '1px solid #E5E7EB',
+                            borderRadius: '6px',
+                            padding: '0.28rem 0.6rem',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s'
+                          }}
+                          onMouseEnter={e => {
+                            e.target.style.borderColor = '#1B5E20';
+                            e.target.style.background = 'rgba(27,94,32,0.04)';
+                          }}
+                          onMouseLeave={e => {
+                            e.target.style.borderColor = '#E5E7EB';
+                            e.target.style.background = 'transparent';
+                          }}
+                        >
+                          {notification.read ? 'Mark Unread' : 'Mark Read'}
+                        </button>
                         {notification.link && (
                           <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#4B5563' }}>
                             Open linked item / chat
