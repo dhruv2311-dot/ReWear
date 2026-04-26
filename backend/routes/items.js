@@ -26,7 +26,7 @@ router.get('/user/my', protect, getMyItems);
 router.post('/', protect, upload.array('images', 5), createItem);
 
 router.get('/:id', getItem);
-router.put('/:id', protect, updateItem);
+router.put('/:id', protect, upload.array('images', 5), updateItem);
 router.delete('/:id', protect, deleteItem);
 
 // Admin

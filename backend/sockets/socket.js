@@ -61,7 +61,6 @@ const setupSocket = (io) => {
 
         // Broadcast to room
         io.to(swapId).emit('message:new', message);
-        io.to(swapId).emit('newMessage', message);
       } catch (error) {
         socket.emit('error', { message: error.message });
       }
@@ -69,12 +68,10 @@ const setupSocket = (io) => {
 
     // ─── Typing indicator ──────────────────────────────────────────────────
     socket.on('typing:start', ({ swapId }) => {
-      socket.to(swapId).emit('typing:start', { userId: socket.user?._id, user: socket.user?.name });
       socket.to(swapId).emit('userTyping', { userId: socket.user?._id, user: socket.user?.name });
     });
 
     socket.on('typing:stop', ({ swapId }) => {
-      socket.to(swapId).emit('typing:stop');
       socket.to(swapId).emit('userStopTyping', { userId: socket.user?._id });
     });
 

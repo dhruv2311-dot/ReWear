@@ -61,9 +61,11 @@ reviewSchema.post('save', function () {
   this.constructor.calcAverageRating(this.item);
 });
 
-// Update rating on remove
-reviewSchema.post('remove', function () {
-  this.constructor.calcAverageRating(this.item);
+// Update rating on delete
+reviewSchema.post('findOneAndDelete', function (doc) {
+  if (doc) {
+    doc.constructor.calcAverageRating(doc.item);
+  }
 });
 
 module.exports = mongoose.model('Review', reviewSchema);
