@@ -59,6 +59,14 @@
 
 ---
 
+## 📚 API Documentation
+
+Complete Postman documentation for the backend API:
+
+- [ReWear Postman Docs](https://documenter.getpostman.com/view/39189509/2sBXwjwtjt)
+
+---
+
 ## ⚙️ Getting Started
 
 ### Prerequisites
