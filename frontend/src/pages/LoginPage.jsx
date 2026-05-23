@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Lock, Eye, EyeOff, Leaf, Github, Chrome, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Leaf, AlertCircle } from 'lucide-react';
+import { FaGithub } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 
 const LoginPage = () => {
@@ -140,7 +141,7 @@ const LoginPage = () => {
               onMouseEnter={e => { e.currentTarget.style.borderColor = '#24292e'; e.currentTarget.style.background = '#F6F8FA'; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.background = 'white'; }}
             >
-              <Github size={20} color="#24292e" />
+              <FaGithub size={20} color="#24292e" />
               Continue with GitHub
             </button>
           </div>

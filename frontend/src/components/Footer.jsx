@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
-import { Leaf, Instagram, Twitter, Github, Mail, Heart } from 'lucide-react';
+import { Leaf, Heart } from 'lucide-react';
+import { FaInstagram, FaTwitter, FaGithub, FaEnvelope } from 'react-icons/fa';
 
 const Footer = () => {
   const year = new Date().getFullYear();
@@ -45,7 +46,7 @@ const Footer = () => {
             </p>
             {/* Social Links */}
             <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
-              {[Instagram, Twitter, Github, Mail].map((Icon, i) => (
+              {[FaInstagram, FaTwitter, FaGithub, FaEnvelope].map((Icon, i) => (
                 <a key={i} href="#" style={{
                   width: '38px', height: '38px', background: 'rgba(165,214,167,0.15)',
                   border: '1px solid rgba(165,214,167,0.3)', borderRadius: '10px',
